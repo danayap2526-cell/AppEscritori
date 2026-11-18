@@ -1,6 +1,6 @@
 ﻿namespace AppEmocions.Forms
 {
-    partial class FrmDashboard
+    partial class FrmDashboard : Form
     {
         /// <summary>
         /// Required designer variable.
