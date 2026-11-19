@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -34,6 +33,9 @@ namespace AppEmocions.Forms
             ConfigurarFormulario();
             CrearContenido();
             CrearMenuLateral();
+
+            // El panel Fill debe ser el último en acoplarse (z-order más alto = índice 0)
+            panelContenido.BringToFront();
         }
 
         // =========================================
@@ -81,11 +83,13 @@ namespace AppEmocions.Forms
             panelMenu.BorderRadius = 0;
 
             Controls.Add(panelMenu);
-            panelMenu.BringToFront();
 
             CrearCabeceraMenu();
             CrearNavegacion();
             CrearPieMenu();
+
+            // El Fill del menú, el último en acoplarse
+            panelNavegacion.BringToFront();
         }
 
         private void CrearCabeceraMenu()
@@ -144,7 +148,6 @@ namespace AppEmocions.Forms
             panelNavegacion.BackColor = azulMenu;
 
             panelMenu.Controls.Add(panelNavegacion);
-            panelNavegacion.BringToFront();
 
             string[] nombres =
             {
@@ -252,7 +255,6 @@ namespace AppEmocions.Forms
             pie.Controls.Add(titulo);
 
             panelMenu.Controls.Add(pie);
-            pie.BringToFront();
         }
 
         // =========================================
@@ -277,7 +279,7 @@ namespace AppEmocions.Forms
             curso.Location = new Point(32, 16);
 
             Label saludo = new Label();
-            saludo.Text = "Bon dia";
+            saludo.Text = "Bon dia, Marta";
             saludo.Font = new Font("Segoe UI", 21);
             saludo.ForeColor = texto;
             saludo.AutoSize = true;
@@ -429,6 +431,7 @@ namespace AppEmocions.Forms
             iconoAviso.Text = "ⓘ";
             iconoAviso.Font = new Font("Segoe UI", 19);
             iconoAviso.ForeColor = Color.FromArgb(28, 139, 136);
+            iconoAviso.BackColor = Color.Transparent;
             iconoAviso.AutoSize = true;
             iconoAviso.Location = new Point(17, 19);
 
@@ -436,6 +439,7 @@ namespace AppEmocions.Forms
             tituloAviso.Text = "Una dada per acompanyar, no per etiquetar";
             tituloAviso.Font = new Font("Segoe UI", 10, FontStyle.Bold);
             tituloAviso.ForeColor = Color.FromArgb(30, 125, 128);
+            tituloAviso.BackColor = Color.Transparent;
             tituloAviso.AutoSize = true;
             tituloAviso.Location = new Point(55, 14);
 
@@ -443,6 +447,7 @@ namespace AppEmocions.Forms
             textoAviso.Text = "Aquestes dades són senyals per observar, no un diagnòstic.";
             textoAviso.Font = new Font("Segoe UI", 9);
             textoAviso.ForeColor = gris;
+            textoAviso.BackColor = Color.Transparent;
             textoAviso.AutoSize = true;
             textoAviso.Location = new Point(55, 39);
 
@@ -540,6 +545,7 @@ namespace AppEmocions.Forms
                 valor.Text = valores[i];
                 valor.Font = new Font("Segoe UI", 22, FontStyle.Bold);
                 valor.ForeColor = texto;
+                valor.BackColor = Color.Transparent;
                 valor.AutoSize = true;
                 valor.Location = new Point(17, 75);
 
@@ -547,6 +553,7 @@ namespace AppEmocions.Forms
                 titulo.Text = titulos[i];
                 titulo.Font = new Font("Segoe UI", 9);
                 titulo.ForeColor = gris;
+                titulo.BackColor = Color.Transparent;
                 titulo.AutoSize = true;
                 titulo.Location = new Point(17, 124);
 
@@ -557,12 +564,12 @@ namespace AppEmocions.Forms
                 variacion.BackColor = Color.FromArgb(235, 248, 245);
                 variacion.AutoSize = true;
                 variacion.Padding = new Padding(5, 4, 5, 4);
-                variacion.Location = new Point(145, 80);
 
                 tarjeta.Controls.Add(icono);
                 tarjeta.Controls.Add(valor);
                 tarjeta.Controls.Add(titulo);
                 tarjeta.Controls.Add(variacion);
+                AnclarDerecha(tarjeta, variacion, 80, 17);
 
                 indicadores.Controls.Add(tarjeta, i, 0);
             }
@@ -595,6 +602,7 @@ namespace AppEmocions.Forms
                 aviso.Width = ancho;
                 indicadores.Width = ancho;
                 inferiores.Width = ancho;
+                inferiores.Height = Math.Max(390, zona.ClientSize.Height - 300 - 24);
             };
         }
 
@@ -617,6 +625,14 @@ namespace AppEmocions.Forms
             return tarjeta;
         }
 
+        // Mantiene un control pegado al borde derecho de su tarjeta
+        private void AnclarDerecha(Control tarjeta, Control c, int top, int margen = 20)
+        {
+            void Colocar() => c.Location = new Point(tarjeta.Width - c.Width - margen, top);
+            tarjeta.Resize += (s, e) => Colocar();
+            Colocar();
+        }
+
         // =========================================
         // EVOLUCIÓN SEMANAL
         // =========================================
@@ -626,6 +642,7 @@ namespace AppEmocions.Forms
             Guna2Panel tarjeta = CrearTarjeta();
             tarjeta.Dock = DockStyle.Fill;
             tarjeta.Margin = new Padding(0, 0, 14, 0);
+            tarjeta.Padding = new Padding(20, 85, 20, 25);
 
             Label titulo = CrearTituloPanel(
                 "Taxa d'encert per setmana", 20, 20);
@@ -637,18 +654,17 @@ namespace AppEmocions.Forms
             enlace.Text = "Veure evolució  ›";
             enlace.Font = new Font("Segoe UI", 8, FontStyle.Bold);
             enlace.ForeColor = Color.FromArgb(28, 145, 143);
+            enlace.BackColor = Color.Transparent;
             enlace.AutoSize = true;
-            enlace.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            enlace.Location = new Point(450, 24);
 
             ChartCanvas grafico = new ChartCanvas(EstilGrafico.Linea);
             grafico.Dock = DockStyle.Fill;
-            grafico.Margin = new Padding(20, 85, 20, 25);
 
             tarjeta.Controls.Add(titulo);
             tarjeta.Controls.Add(subtitulo);
             tarjeta.Controls.Add(enlace);
             tarjeta.Controls.Add(grafico);
+            AnclarDerecha(tarjeta, enlace, 24);
 
             return tarjeta;
         }
@@ -662,6 +678,7 @@ namespace AppEmocions.Forms
             Guna2Panel tarjeta = CrearTarjeta();
             tarjeta.Dock = DockStyle.Fill;
             tarjeta.Margin = new Padding(0, 0, 14, 0);
+            tarjeta.Padding = new Padding(15, 85, 15, 25);
 
             Label titulo = CrearTituloPanel(
                 "Encerts i errors per nivell", 18, 20);
@@ -671,7 +688,6 @@ namespace AppEmocions.Forms
 
             ChartCanvas grafico = new ChartCanvas(EstilGrafico.Barras);
             grafico.Dock = DockStyle.Fill;
-            grafico.Margin = new Padding(15, 85, 15, 25);
 
             tarjeta.Controls.Add(titulo);
             tarjeta.Controls.Add(subtitulo);
@@ -700,12 +716,13 @@ namespace AppEmocions.Forms
             enlace.Text = "Veure tots  ›";
             enlace.Font = new Font("Segoe UI", 8, FontStyle.Bold);
             enlace.ForeColor = Color.FromArgb(28, 145, 143);
+            enlace.BackColor = Color.Transparent;
             enlace.AutoSize = true;
-            enlace.Location = new Point(235, 24);
 
             tarjeta.Controls.Add(titulo);
             tarjeta.Controls.Add(subtitulo);
             tarjeta.Controls.Add(enlace);
+            AnclarDerecha(tarjeta, enlace, 24);
 
             string[] codigos = { "LM-1093", "AR-7745", "NT-3308" };
 
@@ -754,6 +771,7 @@ namespace AppEmocions.Forms
                 codigo.Text = codigos[i];
                 codigo.Font = new Font("Segoe UI", 9, FontStyle.Bold);
                 codigo.ForeColor = texto;
+                codigo.BackColor = Color.Transparent;
                 codigo.AutoSize = true;
                 codigo.Location = new Point(77, y + 15);
 
@@ -761,6 +779,7 @@ namespace AppEmocions.Forms
                 motivo.Text = motivos[i];
                 motivo.Font = new Font("Segoe UI", 7);
                 motivo.ForeColor = gris;
+                motivo.BackColor = Color.Transparent;
                 motivo.AutoSize = true;
                 motivo.Location = new Point(77, y + 40);
 
@@ -771,13 +790,17 @@ namespace AppEmocions.Forms
                 estado.BackColor = Color.FromArgb(255, 244, 220);
                 estado.AutoSize = true;
                 estado.Padding = new Padding(7, 5, 7, 5);
-                estado.Location = new Point(255, y + 23);
 
                 tarjeta.Controls.Add(separador);
                 tarjeta.Controls.Add(avatar);
                 tarjeta.Controls.Add(codigo);
                 tarjeta.Controls.Add(motivo);
                 tarjeta.Controls.Add(estado);
+
+                AnclarDerecha(tarjeta, estado, y + 23);
+
+                tarjeta.Resize += (s, e) => separador.Width = Math.Max(50, tarjeta.Width - 36);
+                separador.Width = Math.Max(50, tarjeta.Width - 36);
             }
 
             return tarjeta;
@@ -793,6 +816,7 @@ namespace AppEmocions.Forms
             label.Text = contenido;
             label.Font = new Font("Segoe UI", 11, FontStyle.Bold);
             label.ForeColor = texto;
+            label.BackColor = Color.Transparent;
             label.AutoSize = true;
             label.Location = new Point(x, y);
 
@@ -805,6 +829,7 @@ namespace AppEmocions.Forms
             label.Text = contenido;
             label.Font = new Font("Segoe UI", 8);
             label.ForeColor = gris;
+            label.BackColor = Color.Transparent;
             label.AutoSize = true;
             label.Location = new Point(x, y);
 
@@ -844,6 +869,7 @@ namespace AppEmocions.Forms
         {
             _estil = estil;
             DoubleBuffered = true;
+            ResizeRedraw = true;
             BackColor = Color.White;
         }
 
