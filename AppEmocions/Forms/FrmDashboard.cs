@@ -2,15 +2,16 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Globalization;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
+using AppEmocions.Data;
 using Guna.UI2.WinForms;
 
 namespace AppEmocions.Forms
 {
-    // =============================================
-    // MODELO (más adelante vendrá de la API)
-    // =============================================
-
     public record InfantAtencion(string Codigo, string Motivo, string Estado);
 
     public partial class FrmDashboard : Form
@@ -38,8 +39,8 @@ namespace AppEmocions.Forms
         private Guna2Button btnFechas = null!;
         private ToolStripDropDown ddCalendario = null!;
         private MonthCalendar calendario = null!;
-        private DateTime fechaInicio = new DateTime(2026, 11, 1);
-        private DateTime fechaFin = new DateTime(2026, 11, 30);
+        private DateTime fechaInicio;
+        private DateTime fechaFin;
 
         private static readonly string[] MesesCortos =
         {
@@ -47,12 +48,32 @@ namespace AppEmocions.Forms
             "jul.", "ag.", "set.", "oct.", "nov.", "des."
         };
 
+        // ELEMENTOS QUE SE RELLENAN CON DATOS DE LA API
+        private readonly Label[] lblValores = new Label[6];
+        private readonly Label[] lblVariaciones = new Label[6];
+        private ChartCanvas graficoLinea = null!;
+        private ChartCanvas graficoBarras = null!;
+        private Label lblSubEvolucion = null!;
+        private Label lblEstado = null!;
+        private Guna2Panel panelAtencion = null!;
+        private Label lblSinInfants = null!;
+        private readonly List<Guna2Panel> filasAtencion = new();
+
+        private CancellationTokenSource? _cts;
+
+        private static readonly CultureInfo Cultura = new("ca-ES");
+
         // Evento para que otros formularios se enteren de qué infant se pulsó
         public event Action<string>? InfantSeleccionado;
 
         public FrmDashboard()
         {
             InitializeComponent();
+
+            // Rango inicial: mes actual
+            DateTime hoy = DateTime.Today;
+            fechaInicio = new DateTime(hoy.Year, hoy.Month, 1);
+            fechaFin = fechaInicio.AddMonths(1).AddDays(-1);
 
             ConfigurarFormulario();
             CrearContenido();
@@ -62,27 +83,227 @@ namespace AppEmocions.Forms
             panelContenido.BringToFront();
         }
 
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            _ = CargarDatosAsync();
+        }
+
         // =========================================
-        // DATOS DE EJEMPLO
-        // TODO: sustituir por llamadas a ApiClient cuando
-        //       estén listos los endpoints del dashboard
+        // CARGA DE DATOS (API)
         // =========================================
 
-        private List<InfantAtencion> ObtenerInfantsAtencion()
+        // Se llama cuando cambia el grupo o el rango de fechas
+        private void FiltroCambiado() => _ = CargarDatosAsync();
+
+        // null = todos los grupos. Los textos deben coincidir con participante.grupo
+        private string? GrupoSeleccionado() =>
+            cmbGrupos.SelectedIndex <= 0 ? null : cmbGrupos.SelectedItem?.ToString();
+
+        private async Task CargarDatosAsync()
         {
-            return new List<InfantAtencion>
+            _cts?.Cancel();
+            var cts = _cts = new CancellationTokenSource();
+            CancellationToken ct = cts.Token;
+
+            DateTime ini = fechaInicio.Date;
+            DateTime fin = fechaFin.Date;
+            string? grupo = GrupoSeleccionado();
+
+            // Periodo anterior de la misma duración (para las variaciones)
+            int dias = (fin - ini).Days + 1;
+            DateTime finPrev = ini.AddDays(-1);
+            DateTime iniPrev = ini.AddDays(-dias);
+
+            lblSubEvolucion.Text = grupo == null ? "Mitjana dels dos grups" : $"Grup {grupo}";
+            MostrarEstado("Carregant dades…", false);
+
+            try
             {
-                new("LM-1093", "Més temps de resposta", "Observar"),
-                new("AR-7745", "2 sessions interrompudes", "Revisar"),
-                new("NT-3308", "Baixada d'encerts recent", "Revisar")
+                var tResumen = ApiClient.ResumenAsync(ini, fin, grupo, ct);
+                var tPrevio = ApiClient.ResumenAsync(iniPrev, finPrev, grupo, ct);
+                var tSemanas = ApiClient.SemanasAsync(ini, fin, grupo, ct);
+                var tNiveles = ApiClient.NivelesAsync(ini, fin, grupo, ct);
+                var tAtencion = ApiClient.AtencionAsync(ini, fin, grupo, ct);
+
+                await Task.WhenAll(tResumen, tPrevio, tSemanas, tNiveles, tAtencion);
+
+                if (ct.IsCancellationRequested || IsDisposed) return;
+
+                PintarKpis(await tResumen, await tPrevio);
+                PintarSemanas(await tSemanas ?? new());
+                PintarNiveles(await tNiveles ?? new());
+                CargarFilasAtencion(
+                    (await tAtencion ?? new())
+                        .Select(a => new InfantAtencion(a.Codigo, a.Motivo, a.Estado))
+                        .ToList());
+
+                MostrarEstado("", false);
+            }
+            catch (Exception) when (ct.IsCancellationRequested)
+            {
+                // Sustituida por una carga más reciente: no hacer nada
+            }
+            catch (Exception)
+            {
+                if (IsDisposed) return;
+                LimpiarDatos();
+                MostrarEstado("● Sense connexió amb el servidor", true);
+            }
+        }
+
+        private void MostrarEstado(string mensaje, bool error)
+        {
+            lblEstado.Text = mensaje;
+            lblEstado.ForeColor = error ? Color.FromArgb(200, 70, 60) : gris;
+            lblEstado.Visible = mensaje.Length > 0;
+        }
+
+        private void LimpiarDatos()
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                lblValores[i].Text = "–";
+                lblVariaciones[i].Visible = false;
+            }
+
+            graficoLinea.SetLinea(Array.Empty<(string, float)>());
+            graficoBarras.SetBarras(Array.Empty<(string, float, float)>());
+            CargarFilasAtencion(new List<InfantAtencion>(), mostrarVacio: false);
+        }
+
+        // ---- KPIs ----
+
+        private static readonly bool[] MayorEsMejor = { true, true, true, true, false, false };
+
+        private static double?[] Metricas(ResumenDto? r)
+        {
+            if (r == null) return new double?[6];
+
+            double encertables = r.Aciertos + r.Errores;
+
+            return new double?[]
+            {
+                r.ParticipantesActivos,
+                r.Sesiones,
+                r.PuntuacionMedia,
+                encertables > 0 ? (double?)(r.Aciertos * 100 / encertables) : null,
+                r.RespMediaMs / 1000,
+                r.Sesiones > 0 ? (double?)(r.Abandonadas * 100 / r.Sesiones) : null
             };
         }
 
-        // Se llama cuando cambia el grupo o el rango de fechas
-        private void FiltroCambiado()
+        private void PintarKpis(ResumenDto? actual, ResumenDto? previo)
         {
-            // TODO: recargar KPIs, gráficas y lista con la API usando:
-            //   cmbGrupos.SelectedItem, fechaInicio, fechaFin
+            double?[] a = Metricas(actual);
+            double?[] p = Metricas(previo);
+
+            Func<double, string>[] formato =
+            {
+                v => v.ToString("N0", Cultura),
+                v => v.ToString("N0", Cultura),
+                v => v.ToString("0.0", Cultura),
+                v => v.ToString("0", Cultura) + "%",
+                v => v.ToString("0.0", Cultura) + " s",
+                v => v.ToString("0.0", Cultura) + "%"
+            };
+
+            for (int i = 0; i < 6; i++)
+            {
+                lblValores[i].Text = a[i] is double v ? formato[i](v) : "–";
+                MostrarVariacion(i, a[i], p[i]);
+            }
+        }
+
+        private void MostrarVariacion(int i, double? actual, double? previo)
+        {
+            Label lbl = lblVariaciones[i];
+
+            bool relativa = i <= 2; // infants, sessions, puntuació: % relativo
+
+            if (actual == null || previo == null || (relativa && previo.Value == 0))
+            {
+                lbl.Visible = false;
+                return;
+            }
+
+            double delta = relativa
+                ? (actual.Value - previo.Value) / previo.Value * 100
+                : actual.Value - previo.Value;
+
+            string unidad = relativa ? "%" : i == 4 ? " s" : " pp";
+
+            if (Math.Round(Math.Abs(delta), 1) == 0)
+            {
+                lbl.Text = "= 0" + unidad;
+                lbl.ForeColor = gris;
+                lbl.BackColor = Color.FromArgb(240, 242, 245);
+            }
+            else
+            {
+                bool sube = delta > 0;
+                bool bueno = sube == MayorEsMejor[i];
+
+                lbl.Text = (sube ? "▲ " : "▼ ") +
+                           Math.Abs(delta).ToString("0.0", Cultura) + unidad;
+                lbl.ForeColor = bueno
+                    ? Color.FromArgb(35, 145, 133)
+                    : Color.FromArgb(190, 95, 45);
+                lbl.BackColor = bueno
+                    ? Color.FromArgb(235, 248, 245)
+                    : Color.FromArgb(252, 238, 230);
+            }
+
+            lbl.Visible = true;
+        }
+
+        // ---- Gráficas ----
+
+        private void PintarSemanas(List<SemanaDto> semanas)
+        {
+            var serie = semanas
+                .Where(s => s.Aciertos + s.Errores > 0)
+                .OrderBy(s => s.Semana)
+                .Select(s => ($"Set. {s.Semana}",
+                              (float)(s.Aciertos * 100 / (s.Aciertos + s.Errores))))
+                .ToList();
+
+            graficoLinea.SetLinea(serie);
+        }
+
+        private void PintarNiveles(List<NivelDto> niveles)
+        {
+            string[] nombres = { "La Plaça", "El Parc", "Plaça Gran", "El Jardí" };
+            var datos = new List<(string, float, float)>();
+
+            for (int n = 1; n <= 4; n++)
+            {
+                NivelDto? d = niveles.FirstOrDefault(x => x.Nivel == n);
+                float acierto = 0, error = 0;
+
+                if (d != null)
+                {
+                    double total = d.Aciertos + d.Errores;
+
+                    if (total > 0)
+                    {
+                        acierto = (float)(d.Aciertos * 100 / total);
+                        error = (float)(d.Errores * 100 / total);
+                    }
+                    else if (d.Registros > 0)
+                    {
+                        // Niveles sin aciertos/errores: % de completados
+                        acierto = (float)(d.Completados * 100 / d.Registros);
+                    }
+                }
+
+                datos.Add((nombres[n - 1], acierto, error));
+            }
+
+            // Sin ningún dato real -> mensaje "Sense dades"
+            graficoBarras.SetBarras(niveles.Count == 0
+                ? Array.Empty<(string, float, float)>()
+                : datos);
         }
 
         // Se llama al pulsar una fila de la lista de infants
@@ -320,6 +541,14 @@ namespace AppEmocions.Forms
             curso.AutoSize = true;
             curso.Location = new Point(32, 16);
 
+            // Estado de la conexión / carga (junto al curso)
+            lblEstado = new Label();
+            lblEstado.Font = new Font("Segoe UI", 8, FontStyle.Bold);
+            lblEstado.BackColor = Color.Transparent;
+            lblEstado.AutoSize = true;
+            lblEstado.Location = new Point(190, 17);
+            lblEstado.Visible = false;
+
             Label saludo = new Label();
             saludo.Text = "Bon dia, Marta";
             saludo.Font = new Font("Segoe UI", 21);
@@ -328,6 +557,7 @@ namespace AppEmocions.Forms
             saludo.Location = new Point(31, 35);
 
             panelCabecera.Controls.Add(curso);
+            panelCabecera.Controls.Add(lblEstado);
             panelCabecera.Controls.Add(saludo);
 
             FlowLayoutPanel controles = new FlowLayoutPanel();
@@ -335,13 +565,13 @@ namespace AppEmocions.Forms
             controles.WrapContents = false;
             controles.AutoScroll = false;
             controles.BackColor = Color.White;
-            controles.Size = new Size(770, 55);
+            controles.Size = new Size(580, 55);
             controles.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             controles.Location = new Point(450, 19);
 
             // ---- DROPDOWN DE GRUPOS ----
             cmbGrupos = new Guna2ComboBox();
-            cmbGrupos.Size = new Size(150, 45);
+            cmbGrupos.Size = new Size(160, 45);
             cmbGrupos.BorderRadius = 10;
             cmbGrupos.BorderThickness = 1;
             cmbGrupos.BorderColor = bordeSuave;
@@ -364,7 +594,7 @@ namespace AppEmocions.Forms
 
             // ---- DROPDOWN CON CALENDARIO ----
             btnFechas = new Guna2Button();
-            btnFechas.Size = new Size(185, 45);
+            btnFechas.Size = new Size(200, 45);
             btnFechas.BorderRadius = 10;
             btnFechas.FillColor = Color.White;
             btnFechas.BackColor = Color.White;
@@ -381,27 +611,7 @@ namespace AppEmocions.Forms
             btnFechas.Click += (s, e) =>
                 ddCalendario.Show(btnFechas, new Point(0, btnFechas.Height + 4));
 
-            Guna2TextBox buscar = new Guna2TextBox();
-            buscar.Size = new Size(170, 45);
-            buscar.BorderRadius = 10;
-            buscar.FillColor = Color.FromArgb(249, 250, 252);
-            buscar.ForeColor = texto;
-            buscar.Font = new Font("Segoe UI", 9);
-            buscar.PlaceholderText = "Cercar...";
-            buscar.Margin = new Padding(4, 0, 5, 0);
-
-            Guna2Button notificaciones = new Guna2Button();
-            notificaciones.Size = new Size(46, 45);
-            notificaciones.BorderRadius = 10;
-            notificaciones.FillColor = Color.White;
-            notificaciones.ForeColor = gris;
-            notificaciones.BorderColor = bordeSuave;
-            notificaciones.BorderThickness = 1;
-            notificaciones.Font = new Font("Segoe UI Symbol", 17);
-            notificaciones.Text = "♧";
-            notificaciones.Cursor = Cursors.Hand;
-            notificaciones.Margin = new Padding(4, 0, 5, 0);
-
+            // ---- PERFIL ----
             Guna2Panel perfil = new Guna2Panel();
             perfil.Size = new Size(200, 48);
             perfil.FillColor = Color.White;
@@ -445,8 +655,6 @@ namespace AppEmocions.Forms
 
             controles.Controls.Add(cmbGrupos);
             controles.Controls.Add(btnFechas);
-            controles.Controls.Add(buscar);
-            controles.Controls.Add(notificaciones);
             controles.Controls.Add(perfil);
 
             panelCabecera.Controls.Add(controles);
@@ -466,7 +674,7 @@ namespace AppEmocions.Forms
         private void CrearCalendarioDesplegable()
         {
             calendario = new MonthCalendar();
-            calendario.MaxSelectionCount = 62;               // permite elegir un rango arrastrando
+            calendario.MaxSelectionCount = 92;               // permite elegir un rango arrastrando
             calendario.FirstDayOfWeek = Day.Monday;
             calendario.ShowToday = false;
             calendario.ShowTodayCircle = false;
@@ -544,7 +752,6 @@ namespace AppEmocions.Forms
             aviso.ShadowDecoration.Enabled = false;
             aviso.Padding = new Padding(4);
 
-            // Zona central (Fill). Se añade primero para que se acople la última.
             Guna2Panel zonaTextos = new Guna2Panel();
             zonaTextos.Dock = DockStyle.Fill;
             zonaTextos.FillColor = colorAviso;
@@ -569,7 +776,6 @@ namespace AppEmocions.Forms
             zonaTextos.Controls.Add(tituloAviso);
             zonaTextos.Controls.Add(textoAviso);
 
-            // Icono (izquierda)
             Guna2Panel zonaIcono = new Guna2Panel();
             zonaIcono.Dock = DockStyle.Left;
             zonaIcono.Width = 52;
@@ -585,7 +791,6 @@ namespace AppEmocions.Forms
             iconoAviso.TextAlign = ContentAlignment.MiddleCenter;
             zonaIcono.Controls.Add(iconoAviso);
 
-            // Botón de cerrar (derecha)
             Guna2Button btnCerrarAviso = new Guna2Button();
             btnCerrarAviso.Dock = DockStyle.Right;
             btnCerrarAviso.Width = 52;
@@ -599,7 +804,6 @@ namespace AppEmocions.Forms
             btnCerrarAviso.HoverState.FillColor = Color.FromArgb(220, 240, 237);
             btnCerrarAviso.ShadowDecoration.Enabled = false;
 
-            // Orden: primero el Fill, después los laterales
             aviso.Controls.Add(zonaTextos);
             aviso.Controls.Add(zonaIcono);
             aviso.Controls.Add(btnCerrarAviso);
@@ -625,14 +829,6 @@ namespace AppEmocions.Forms
             {
                 "Infants actius", "Sessions", "Puntuació mitjana",
                 "Taxa d'encert", "Temps de resposta", "Taxa d'abandonament"
-            };
-
-            string[] valores = { "24", "186", "8,4", "81%", "2,3 s", "6,8%" };
-
-            string[] variaciones =
-            {
-                "▲ 4,2%", "▲ 12,6%", "▲ 3,1%",
-                "▲ 2,8%", "▼ 0,4 s", "▼ 1,2%"
             };
 
             string[] iconos = { "☺", "▷", "◎", "✓", "◷", "☰" };
@@ -680,7 +876,7 @@ namespace AppEmocions.Forms
                 icono.Controls.Add(simbolo);
 
                 Label valor = new Label();
-                valor.Text = valores[i];
+                valor.Text = "–";
                 valor.Font = new Font("Segoe UI", 22, FontStyle.Bold);
                 valor.ForeColor = texto;
                 valor.BackColor = Color.Transparent;
@@ -696,12 +892,16 @@ namespace AppEmocions.Forms
                 titulo.Location = new Point(17, 124);
 
                 Label variacion = new Label();
-                variacion.Text = variaciones[i];
+                variacion.Text = "";
                 variacion.Font = new Font("Segoe UI", 7, FontStyle.Bold);
                 variacion.ForeColor = Color.FromArgb(35, 145, 133);
                 variacion.BackColor = Color.FromArgb(235, 248, 245);
                 variacion.AutoSize = true;
                 variacion.Padding = new Padding(5, 4, 5, 4);
+                variacion.Visible = false;
+
+                lblValores[i] = valor;
+                lblVariaciones[i] = variacion;
 
                 tarjeta.Controls.Add(icono);
                 tarjeta.Controls.Add(valor);
@@ -734,7 +934,6 @@ namespace AppEmocions.Forms
             zona.Controls.Add(indicadores);
             zona.Controls.Add(inferiores);
 
-            // Cerrar el aviso: se oculta y el resto sube
             btnCerrarAviso.Click += (s, e) =>
             {
                 int desplazamiento = aviso.Height + 18;
@@ -776,10 +975,12 @@ namespace AppEmocions.Forms
         }
 
         // Mantiene un control pegado al borde derecho de su contenedor
+        // (también cuando cambia el tamaño del propio control, p. ej. al cambiar su texto)
         private void AnclarDerecha(Control contenedor, Control c, int top, int margen = 20)
         {
             void Colocar() => c.Location = new Point(contenedor.Width - c.Width - margen, top);
             contenedor.Resize += (s, e) => Colocar();
+            c.SizeChanged += (s, e) => Colocar();
             Colocar();
         }
 
@@ -795,7 +996,7 @@ namespace AppEmocions.Forms
             tarjeta.Padding = new Padding(20, 85, 20, 25);
 
             Label titulo = CrearTituloPanel("Taxa d'encert per setmana", 20, 20);
-            Label subtitulo = CrearSubtituloPanel("Mitjana dels dos grups", 20, 50);
+            lblSubEvolucion = CrearSubtituloPanel("Mitjana dels dos grups", 20, 50);
 
             Label enlace = new Label();
             enlace.Text = "Veure evolució  ›";
@@ -805,13 +1006,13 @@ namespace AppEmocions.Forms
             enlace.Cursor = Cursors.Hand;
             enlace.AutoSize = true;
 
-            ChartCanvas grafico = new ChartCanvas(EstilGrafico.Linea);
-            grafico.Dock = DockStyle.Fill;
+            graficoLinea = new ChartCanvas(EstilGrafico.Linea);
+            graficoLinea.Dock = DockStyle.Fill;
 
             tarjeta.Controls.Add(titulo);
-            tarjeta.Controls.Add(subtitulo);
+            tarjeta.Controls.Add(lblSubEvolucion);
             tarjeta.Controls.Add(enlace);
-            tarjeta.Controls.Add(grafico);
+            tarjeta.Controls.Add(graficoLinea);
             AnclarDerecha(tarjeta, enlace, 24);
 
             return tarjeta;
@@ -831,12 +1032,12 @@ namespace AppEmocions.Forms
             Label titulo = CrearTituloPanel("Encerts i errors per nivell", 18, 20);
             Label subtitulo = CrearSubtituloPanel("Sessions puntuables", 18, 50);
 
-            ChartCanvas grafico = new ChartCanvas(EstilGrafico.Barras);
-            grafico.Dock = DockStyle.Fill;
+            graficoBarras = new ChartCanvas(EstilGrafico.Barras);
+            graficoBarras.Dock = DockStyle.Fill;
 
             tarjeta.Controls.Add(titulo);
             tarjeta.Controls.Add(subtitulo);
-            tarjeta.Controls.Add(grafico);
+            tarjeta.Controls.Add(graficoBarras);
 
             return tarjeta;
         }
@@ -850,6 +1051,7 @@ namespace AppEmocions.Forms
             Guna2Panel tarjeta = CrearTarjeta();
             tarjeta.Dock = DockStyle.Fill;
             tarjeta.Margin = new Padding(0);
+            panelAtencion = tarjeta;
 
             Label titulo = CrearTituloPanel("Infants que mereixen atenció", 18, 20);
             Label subtitulo = CrearSubtituloPanel("Senyals recents", 18, 50);
@@ -862,10 +1064,41 @@ namespace AppEmocions.Forms
             enlace.Cursor = Cursors.Hand;
             enlace.AutoSize = true;
 
+            lblSinInfants = new Label();
+            lblSinInfants.Text = "Cap senyal destacat en aquest període.";
+            lblSinInfants.Font = new Font("Segoe UI", 9);
+            lblSinInfants.ForeColor = gris;
+            lblSinInfants.BackColor = Color.Transparent;
+            lblSinInfants.AutoSize = true;
+            lblSinInfants.Location = new Point(18, 100);
+            lblSinInfants.Visible = false;
+
             tarjeta.Controls.Add(titulo);
             tarjeta.Controls.Add(subtitulo);
             tarjeta.Controls.Add(enlace);
+            tarjeta.Controls.Add(lblSinInfants);
             AnclarDerecha(tarjeta, enlace, 24);
+
+            tarjeta.Resize += (s, e) =>
+            {
+                foreach (Guna2Panel fila in filasAtencion)
+                    fila.Width = Math.Max(100, tarjeta.Width - 28);
+            };
+
+            return tarjeta;
+        }
+
+        // Sustituye las filas de la lista por las recibidas de la API
+        private void CargarFilasAtencion(List<InfantAtencion> infants, bool mostrarVacio = true)
+        {
+            foreach (Guna2Panel fila in filasAtencion)
+            {
+                panelAtencion.Controls.Remove(fila);
+                fila.Dispose();
+            }
+            filasAtencion.Clear();
+
+            lblSinInfants.Visible = mostrarVacio && infants.Count == 0;
 
             Color[] colores =
             {
@@ -874,22 +1107,15 @@ namespace AppEmocions.Forms
                 Color.FromArgb(237, 229, 245)
             };
 
-            List<InfantAtencion> infants = ObtenerInfantsAtencion();
-
             for (int i = 0; i < infants.Count; i++)
             {
-                InfantAtencion infant = infants[i];
-                int y = 85 + i * 78;
+                Guna2Panel fila = CrearFilaInfant(infants[i], colores[i % colores.Length]);
+                fila.Location = new Point(14, 85 + i * 78);
+                fila.Width = Math.Max(100, panelAtencion.Width - 28);
 
-                Guna2Panel fila = CrearFilaInfant(infant, colores[i % colores.Length]);
-                fila.Location = new Point(14, y);
-                fila.Width = Math.Max(100, tarjeta.Width - 28);
-
-                tarjeta.Controls.Add(fila);
-                tarjeta.Resize += (s, e) => fila.Width = Math.Max(100, tarjeta.Width - 28);
+                panelAtencion.Controls.Add(fila);
+                filasAtencion.Add(fila);
             }
-
-            return tarjeta;
         }
 
         // Cada fila se comporta como un botón: cursor de mano, resalte al pasar
@@ -913,7 +1139,7 @@ namespace AppEmocions.Forms
             avatar.FillColor = colorAvatar;
 
             Label letras = new Label();
-            letras.Text = infant.Codigo.Substring(0, 2);
+            letras.Text = infant.Codigo.Length >= 2 ? infant.Codigo.Substring(0, 2) : infant.Codigo;
             letras.Dock = DockStyle.Fill;
             letras.BackColor = Color.Transparent;
             letras.ForeColor = texto;
@@ -1028,7 +1254,7 @@ namespace AppEmocions.Forms
     }
 
     // =============================================
-    // CONTROL PERSONALIZADO DE GRÁFICOS
+    // CONTROL PERSONALIZADO DE GRÁFICOS (ahora con datos)
     // =============================================
 
     public class ChartCanvas : Panel
@@ -1037,6 +1263,13 @@ namespace AppEmocions.Forms
 
         private readonly Color turquesa = Color.FromArgb(54, 184, 177);
         private readonly Color naranja = Color.FromArgb(235, 194, 168);
+        private readonly Color gris = Color.FromArgb(135, 145, 165);
+
+        // Línea: (etiqueta, valor 0-100)
+        private List<(string Etiqueta, float Valor)> _serie = new();
+
+        // Barras: (etiqueta, % acierto, % error)
+        private List<(string Etiqueta, float Aciertos, float Errores)> _barras = new();
 
         public ChartCanvas(EstilGrafico estil)
         {
@@ -1046,6 +1279,18 @@ namespace AppEmocions.Forms
             BackColor = Color.White;
         }
 
+        public void SetLinea(IEnumerable<(string, float)> datos)
+        {
+            _serie = datos.ToList();
+            Invalidate();
+        }
+
+        public void SetBarras(IEnumerable<(string, float, float)> datos)
+        {
+            _barras = datos.ToList();
+            Invalidate();
+        }
+
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
@@ -1053,10 +1298,30 @@ namespace AppEmocions.Forms
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
 
+            bool vacio = _estil == EstilGrafico.Linea ? _serie.Count == 0 : _barras.Count == 0;
+
+            if (vacio)
+            {
+                DibujarVacio(g);
+                return;
+            }
+
             if (_estil == EstilGrafico.Linea)
                 DibujarLinea(g);
             else
                 DibujarBarras(g);
+        }
+
+        private void DibujarVacio(Graphics g)
+        {
+            const string mensaje = "Sense dades per al període";
+
+            using Font fuente = new Font("Segoe UI", 9);
+            using Brush pincel = new SolidBrush(gris);
+
+            SizeF medida = g.MeasureString(mensaje, fuente);
+            g.DrawString(mensaje, fuente, pincel,
+                (Width - medida.Width) / 2, (Height - medida.Height) / 2);
         }
 
         private void DibujarLinea(Graphics g)
@@ -1067,63 +1332,63 @@ namespace AppEmocions.Forms
             if (ancho < 100 || alto < 100)
                 return;
 
-            int izquierda = 35;
-            int derecha = ancho - 10;
+            int izquierda = 45;
+            int derecha = ancho - 20;
             int arriba = 25;
             int abajo = alto - 45;
 
             using Pen rejilla = new Pen(Color.FromArgb(225, 232, 239), 1);
             rejilla.DashStyle = DashStyle.Dash;
 
-            string[] porcentajes = { "100%", "75%", "50%", "25%" };
+            using Font fuente = new Font("Segoe UI", 7);
+            using Brush pincel = new SolidBrush(Color.FromArgb(145, 155, 175));
 
-            for (int i = 0; i < 4; i++)
+            // Eje Y: 100, 75, 50, 25, 0
+            for (int i = 0; i < 5; i++)
             {
-                int y = arriba + i * (abajo - arriba) / 3;
-
+                int y = arriba + i * (abajo - arriba) / 4;
                 g.DrawLine(rejilla, izquierda, y, derecha, y);
-
-                using Font fuente = new Font("Segoe UI", 7);
-                using Brush pincel = new SolidBrush(Color.FromArgb(145, 155, 175));
-
-                g.DrawString(porcentajes[i], fuente, pincel, 0, y - 7);
+                g.DrawString((100 - 25 * i) + "%", fuente, pincel, 0, y - 7);
             }
 
-            float[] valores = { 40, 52, 51, 70, 68, 79, 76, 85, 84, 93 };
-            PointF[] puntos = new PointF[valores.Length];
+            int n = _serie.Count;
+            PointF[] puntos = new PointF[n];
 
-            for (int i = 0; i < valores.Length; i++)
+            for (int i = 0; i < n; i++)
             {
-                float x = izquierda + i * (derecha - izquierda) / (float)(valores.Length - 1);
-                float y = abajo - valores[i] / 100f * (abajo - arriba);
+                float x = n == 1
+                    ? (izquierda + derecha) / 2f
+                    : izquierda + i * (derecha - izquierda) / (float)(n - 1);
+
+                float valor = Math.Max(0, Math.Min(100, _serie[i].Valor));
+                float y = abajo - valor / 100f * (abajo - arriba);
 
                 puntos[i] = new PointF(x, y);
             }
 
-            using GraphicsPath camino = new GraphicsPath();
-            camino.AddCurve(puntos, 0.35f);
+            if (n >= 2)
+            {
+                using GraphicsPath camino = new GraphicsPath();
+                camino.AddCurve(puntos, 0.35f);
 
-            using GraphicsPath area = (GraphicsPath)camino.Clone();
+                using GraphicsPath area = (GraphicsPath)camino.Clone();
 
-            area.AddLine(
-                puntos[puntos.Length - 1].X,
-                puntos[puntos.Length - 1].Y,
-                derecha, abajo);
+                area.AddLine(puntos[n - 1].X, puntos[n - 1].Y, puntos[n - 1].X, abajo);
+                area.AddLine(puntos[n - 1].X, abajo, puntos[0].X, abajo);
+                area.CloseFigure();
 
-            area.AddLine(derecha, abajo, izquierda, abajo);
-            area.CloseFigure();
+                using LinearGradientBrush degradado = new LinearGradientBrush(
+                    new Rectangle(izquierda, arriba, Math.Max(1, derecha - izquierda), abajo - arriba),
+                    Color.FromArgb(75, 54, 184, 177),
+                    Color.FromArgb(0, 54, 184, 177),
+                    LinearGradientMode.Vertical);
 
-            using LinearGradientBrush degradado = new LinearGradientBrush(
-                new Rectangle(izquierda, arriba, derecha - izquierda, abajo - arriba),
-                Color.FromArgb(75, 54, 184, 177),
-                Color.FromArgb(0, 54, 184, 177),
-                LinearGradientMode.Vertical);
+                g.FillPath(degradado, area);
 
-            g.FillPath(degradado, area);
-
-            using Pen linea = new Pen(turquesa, 3);
-            linea.LineJoin = LineJoin.Round;
-            g.DrawPath(linea, camino);
+                using Pen linea = new Pen(turquesa, 3);
+                linea.LineJoin = LineJoin.Round;
+                g.DrawPath(linea, camino);
+            }
 
             foreach (PointF punto in puntos)
             {
@@ -1133,15 +1398,16 @@ namespace AppEmocions.Forms
                 g.DrawEllipse(borde, punto.X - 4, punto.Y - 4, 8, 8);
             }
 
-            string[] semanas = { "Set. 1", "Set. 2", "Set. 3", "Set. 4", "Set. 5" };
-
+            // Etiquetas del eje X (una de cada dos si hay muchas semanas)
+            int paso = n > 10 ? 2 : 1;
             using Font fuenteSemana = new Font("Segoe UI", 7);
             using Brush pincelSemana = new SolidBrush(Color.FromArgb(135, 145, 165));
 
-            for (int i = 0; i < semanas.Length; i++)
+            for (int i = 0; i < n; i += paso)
             {
-                float x = izquierda + i * (derecha - izquierda) / 4f;
-                g.DrawString(semanas[i], fuenteSemana, pincelSemana, x - 15, abajo + 15);
+                SizeF medida = g.MeasureString(_serie[i].Etiqueta, fuenteSemana);
+                g.DrawString(_serie[i].Etiqueta, fuenteSemana, pincelSemana,
+                    puntos[i].X - medida.Width / 2, abajo + 15);
             }
         }
 
@@ -1167,42 +1433,45 @@ namespace AppEmocions.Forms
                 g.DrawLine(rejilla, izquierda, y, derecha, y);
             }
 
-            string[] niveles = { "La Plaça", "El Parc", "Plaça Gran", "El Jardí" };
-
-            float[] aciertos = { 76, 68, 86, 81 };
-            float[] errores = { 18, 25, 0, 0 };
-
-            int espacio = (derecha - izquierda) / 4;
+            int n = _barras.Count;
+            int espacio = (derecha - izquierda) / n;
 
             using Font fuente = new Font("Segoe UI", 7);
-            using Brush textoBrush = new SolidBrush(Color.FromArgb(135, 145, 165));
+            using Brush textoBrush = new SolidBrush(gris);
 
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < n; i++)
             {
+                var barra = _barras[i];
                 int centro = izquierda + espacio * i + espacio / 2;
 
-                int alturaAciertos = (int)((abajo - arriba) * aciertos[i] / 100);
-                int alturaErrores = (int)((abajo - arriba) * errores[i] / 100);
+                float pctAciertos = Math.Max(0, Math.Min(100, barra.Aciertos));
+                float pctErrores = Math.Max(0, Math.Min(100, barra.Errores));
 
-                Rectangle barraAciertos = new Rectangle(
-                    centro - 15, abajo - alturaAciertos, 17, alturaAciertos);
+                int alturaAciertos = (int)((abajo - arriba) * pctAciertos / 100);
+                int alturaErrores = (int)((abajo - arriba) * pctErrores / 100);
 
-                using SolidBrush pincelAciertos = new SolidBrush(turquesa);
-                g.FillRoundedRectangle(pincelAciertos, barraAciertos, 6);
-
-                if (errores[i] > 0)
+                if (alturaAciertos >= 3)
                 {
-                    Rectangle barraErrores = new Rectangle(
+                    Rectangle rectAciertos = new Rectangle(
+                        centro - 15, abajo - alturaAciertos, 17, alturaAciertos);
+
+                    using SolidBrush pincelAciertos = new SolidBrush(turquesa);
+                    g.FillRoundedRectangle(pincelAciertos, rectAciertos, 6);
+                }
+
+                if (alturaErrores >= 3)
+                {
+                    Rectangle rectErrores = new Rectangle(
                         centro + 7, abajo - alturaErrores, 17, alturaErrores);
 
                     using SolidBrush pincelErrores = new SolidBrush(naranja);
-                    g.FillRoundedRectangle(pincelErrores, barraErrores, 6);
+                    g.FillRoundedRectangle(pincelErrores, rectErrores, 6);
                 }
 
-                SizeF medida = g.MeasureString(niveles[i], fuente);
+                SizeF medida = g.MeasureString(barra.Etiqueta, fuente);
 
                 g.DrawString(
-                    niveles[i], fuente, textoBrush,
+                    barra.Etiqueta, fuente, textoBrush,
                     centro - medida.Width / 2, abajo + 10);
             }
         }
