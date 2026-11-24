@@ -221,8 +221,35 @@ public class DashboardController : ControllerBaseDatos
     }
 
     // =====================================================
-    // Endpoints anteriores (sin cambios)
+    // Endpoints anteriores
     // =====================================================
+
+    // =====================================================
+    // GRUPOS
+    // =====================================================
+
+    // GET: api/dashboard/grupos
+    // Administrador: devuelve todos los grupos existentes.
+    [HttpGet("grupos")]
+    public IActionResult Grupos()
+    {
+        const string sql = @"
+            SELECT DISTINCT
+                LTRIM(RTRIM(grupo)) AS grupo
+            FROM dbo.DOCENTE_GRUPO
+            WHERE grupo IS NOT NULL
+              AND LTRIM(RTRIM(grupo)) <> ''
+            ORDER BY grupo;";
+
+        var filas = Convertir(_db.Consultar(sql));
+
+        var grupos = filas
+            .Select(f => f["grupo"]?.ToString())
+            .Where(g => !string.IsNullOrWhiteSpace(g))
+            .ToList();
+
+        return Ok(grupos);
+    }
 
     // GET: api/dashboard/tasa-acierto
     [HttpGet("tasa-acierto")]
