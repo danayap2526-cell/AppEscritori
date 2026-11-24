@@ -81,6 +81,7 @@ namespace AppEmocions.Forms
 
             // El panel Fill debe ser el último en acoplarse
             panelContenido.BringToFront();
+
         }
 
         protected override void OnShown(EventArgs e)
@@ -151,6 +152,35 @@ namespace AppEmocions.Forms
                 MostrarEstado("● Sense connexió amb el servidor", true);
             }
         }
+
+
+        private async Task CargarGruposAsync()
+        {
+            try
+            {
+                cmbGrupos.Items.Clear();
+
+                var grupos = await ApiClient.ListarGruposAsync();
+
+                cmbGrupos.Items.Add("Todos");
+
+                foreach (var grupo in grupos)
+                {
+                    cmbGrupos.Items.Add(grupo);
+                }
+
+                cmbGrupos.SelectedIndex = 0;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    "No se pudieron cargar los grupos: " + ex.Message,
+                    "Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+        }
+
 
         private void MostrarEstado(string mensaje, bool error)
         {
@@ -585,8 +615,11 @@ namespace AppEmocions.Forms
             cmbGrupos.Items.AddRange(new object[]
             {
                 "P4-A i P4-B",
+                "P5-A i P5-B",
                 "P4-A",
-                "P4-B"
+                "P4-B",
+                "P5-A",
+                "P5-B"
             });
             cmbGrupos.SelectedIndex = 0;
             cmbGrupos.Margin = new Padding(4, 0, 5, 0);
@@ -643,7 +676,7 @@ namespace AppEmocions.Forms
             nombre.Location = new Point(52, 4);
 
             Label rol = new Label();
-            rol.Text = "Educadora";
+            rol.Text = "Educador/a";
             rol.Font = new Font("Segoe UI", 8);
             rol.ForeColor = gris;
             rol.AutoSize = true;

@@ -1,4 +1,3 @@
-
 using AppEmocions.Api.Data;
 
 var builder = WebApplication.CreateBuilder(args);

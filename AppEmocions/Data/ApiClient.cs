@@ -12,6 +12,15 @@ namespace AppEmocions.Data
             Timeout = TimeSpan.FromSeconds(10)
         };
 
+
+        public static async Task<List<string>> ListarGruposAsync(
+            CancellationToken ct = default)
+        {
+            return await _http.GetFromJsonAsync<List<string>>(
+                "api/dashboard/grupos", ct) ?? new();
+        }
+
+
         public static async Task<(bool ok, string mensaje)> ProbarAsync()
         {
             try
