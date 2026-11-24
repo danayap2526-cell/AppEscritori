@@ -36,7 +36,8 @@ public class SesionesController : ControllerBaseDatos
                 s.completada,
                 s.abandonada,
                 s.simulada,
-                s.aciertos
+                s.aciertos,
+                s.dificultad
 
             FROM dbo.sesion s
             INNER JOIN dbo.participante p
@@ -75,7 +76,8 @@ public class SesionesController : ControllerBaseDatos
                 s.completada,
                 s.abandonada,
                 s.simulada,
-                s.aciertos
+                s.aciertos,
+                s.dificultad
 
             FROM dbo.sesion s
             INNER JOIN dbo.participante p
