@@ -24,7 +24,7 @@ public class MovilController : ControllerBaseDatos
         public int Ayudas { get; set; }
         public int Aciertos { get; set; }
         public int? RespMediaMs { get; set; }         // tiempo medio de respuesta en ms
-        public string? Dificultad { get; set; }       // "facil"/"dificil": de momento no se guarda (la BD no tiene columna)
+        public string? Dificultad { get; set; }       // "facil" o "dificil" (columna dbo.sesion.dificultad, ver Sql/add_dificultad.sql)
         public bool Completada { get; set; } = true;
         public bool Simulada { get; set; }            // true para datos de prueba
     }
@@ -39,6 +39,9 @@ public class MovilController : ControllerBaseDatos
             return BadRequest("Nivel debe estar entre 1 y 4.");
         if (d.DuracionS < 0 || d.Intentos < 0 || d.Errores < 0 || d.Ayudas < 0 || d.Aciertos < 0)
             return BadRequest("Los contadores no pueden ser negativos.");
+
+        // Solo se aceptan "facil" o "dificil"; cualquier otro valor se guarda vacío.
+        var dificultad = d.Dificultad == "facil" || d.Dificultad == "dificil" ? d.Dificultad : null;
 
         var sesionId = Guid.NewGuid().ToString();
         var ahoraUtc = DateTime.UtcNow;
@@ -59,10 +62,10 @@ public class MovilController : ControllerBaseDatos
 
             INSERT INTO dbo.sesion
                 (sesion_id, participante_id, juego_id, schema_version, iniciada_en, iniciada_utc, fecha_local,
-                 duracion_s, puntuacion, nivel_alcanzado, intentos, errores, ayudas, completada, abandonada, simulada, aciertos, resp_media_ms)
+                 duracion_s, puntuacion, nivel_alcanzado, intentos, errores, ayudas, completada, abandonada, simulada, aciertos, resp_media_ms, dificultad)
             VALUES
                 (@sesion, @pid, 1, 1, @inicioLocal, @inicioUtc, CAST(@inicioLocal AS date),
-                 @dur, @punt, @nivel, @intentos, @errores, @ayudas, @completada, 0, @simulada, @aciertos, @resp);
+                 @dur, @punt, @nivel, @intentos, @errores, @ayudas, @completada, 0, @simulada, @aciertos, @resp, @dificultad);
 
             INSERT INTO dbo.nivel_sesion
                 (sesion_id, nivel, completado, duracion_ms, intentos, errores, ayudas, aciertos, resp_media_ms)
@@ -88,7 +91,8 @@ public class MovilController : ControllerBaseDatos
                 new SqlParameter("@completada", d.Completada),
                 new SqlParameter("@simulada", d.Simulada),
                 new SqlParameter("@aciertos", d.Aciertos),
-                new SqlParameter("@resp", (object?)d.RespMediaMs ?? DBNull.Value));
+                new SqlParameter("@resp", (object?)d.RespMediaMs ?? DBNull.Value),
+                new SqlParameter("@dificultad", (object?)dificultad ?? DBNull.Value));
         }
         catch (SqlException ex)
         {
@@ -103,7 +107,8 @@ public class MovilController : ControllerBaseDatos
     public IActionResult SesionesDe(string codigo)
     {
         const string sql = @"
-            SELECT s.sesion_id, s.iniciada_en, s.duracion_s, s.puntuacion, s.nivel_alcanzado, s.errores, s.aciertos
+            SELECT s.sesion_id, s.iniciada_en, s.duracion_s, s.puntuacion, s.nivel_alcanzado, s.errores, s.aciertos,
+                   s.resp_media_ms, s.dificultad
             FROM dbo.sesion s
             INNER JOIN dbo.participante p ON p.participante_id = s.participante_id
             WHERE p.codigo = @codigo
