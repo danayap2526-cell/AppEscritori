@@ -71,6 +71,11 @@ public static class ApiClient
         _http.GetFromJsonAsync<List<NivelDto>>(
             $"api/dashboard/niveles?{Filtros(desde, hasta, grupo)}", _jsonOpts, ct);
 
+    // Sobrecarga compatible con llamadas de 4 argumentos: (desde, hasta, grupo, ct)
+    public static Task<List<AtencionDto>?> AtencionAsync(
+        DateTime desde, DateTime hasta, string? grupo, CancellationToken ct) =>
+        AtencionAsync(desde, hasta, grupo, limite: 3, ct);
+
     public static Task<List<AtencionDto>?> AtencionAsync(
         DateTime desde, DateTime hasta, string? grupo, int limite = 3, CancellationToken ct = default) =>
         _http.GetFromJsonAsync<List<AtencionDto>>(
