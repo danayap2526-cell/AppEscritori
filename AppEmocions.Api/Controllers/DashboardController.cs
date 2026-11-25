@@ -1,4 +1,6 @@
-﻿using AppEmocions.Api.Data.Dashboard;
+using AppEmocions.Api.Data;
+using AppEmocions.Api.Dtos.Dashboard;
+using AppEmocions.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppEmocions.Api.Controllers;

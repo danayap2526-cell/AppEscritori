@@ -1,0 +1,1 @@
+namespace AppEmocions.Api.Dtos.Dashboard; public sealed class ComparativaNivelGrupoDto { public string Grupo { get; set; } = string.Empty; public byte Nivel { get; set; } public double TasaAcierto { get; set; } }

@@ -1,0 +1,1 @@
+namespace AppEmocions.Api.Dtos.Movil; public sealed class SesionMovilHistorialDto { public string SesionId { get; set; } = ""; public DateTime IniciadaEn { get; set; } public int? DuracionS { get; set; } public decimal? Puntuacion { get; set; } public byte? NivelAlcanzado { get; set; } public int Errores { get; set; } public int Aciertos { get; set; } }

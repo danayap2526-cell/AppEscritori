@@ -1,0 +1,1 @@
+namespace AppEmocions.Api.Dtos.Dashboard; public sealed class SemanaEvolucionDto { public int Semana { get; set; } public string? Grupo { get; set; } public int Aciertos { get; set; } public int Errores { get; set; } public double TasaAcierto { get; set; } }

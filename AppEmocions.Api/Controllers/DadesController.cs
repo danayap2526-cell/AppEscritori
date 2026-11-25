@@ -1,5 +1,6 @@
-﻿using AppEmocions.Api.Data.Dades;
-using AppEmocions.Api.Data.Movil;
+using AppEmocions.Api.Dtos.Movil;
+using AppEmocions.Api.Data;
+using AppEmocions.Api.Dtos.Dades;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppEmocions.Api.Controllers;

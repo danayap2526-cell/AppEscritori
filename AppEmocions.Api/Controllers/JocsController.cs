@@ -1,4 +1,5 @@
-﻿using AppEmocions.Api.Data.Jocs;
+using AppEmocions.Api.Data;
+using AppEmocions.Api.Dtos.Jocs;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AppEmocions.Api.Controllers;

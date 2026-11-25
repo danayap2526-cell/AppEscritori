@@ -1,4 +1,5 @@
-﻿using AppEmocions.Api.Data.Movil;
+using AppEmocions.Api.Data;
+using AppEmocions.Api.Dtos.Movil;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 

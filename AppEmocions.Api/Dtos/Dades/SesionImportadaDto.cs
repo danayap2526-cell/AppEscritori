@@ -1,0 +1,1 @@
+namespace AppEmocions.Api.Dtos.Dades; public sealed class SesionImportadaDto { public string SesionId { get; set; } = string.Empty; public string CodigoInfant { get; set; } = string.Empty; public DateTime Data { get; set; } public string Joc { get; set; } = string.Empty; public bool Simulada { get; set; } public string Estat { get; set; } = "OK"; }
