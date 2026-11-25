@@ -1,0 +1,1 @@
+namespace AppEmocions.Api.Dtos.Dashboard; public sealed class AbandonoNivelGrupoDto { public byte Nivel { get; set; } public string Grupo { get; set; } = string.Empty; public int Iniciadas { get; set; } public int Completadas { get; set; } public int Descansar { get; set; } public int Sortida { get; set; } public int SegonPla { get; set; } }

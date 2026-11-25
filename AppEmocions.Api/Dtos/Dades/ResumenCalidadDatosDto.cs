@@ -1,0 +1,1 @@
+namespace AppEmocions.Api.Dtos.Dades; public sealed record ResumenCalidadDatosDto(int TotalSesiones, int SesionesSinIncidencias, double PorcentajeCalidad, IEnumerable<IncidenciaCoherenciaDto> Incidencias);

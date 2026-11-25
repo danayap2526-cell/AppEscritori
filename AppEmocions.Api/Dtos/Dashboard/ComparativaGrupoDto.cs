@@ -1,0 +1,1 @@
+namespace AppEmocions.Api.Dtos.Dashboard; public sealed class ComparativaGrupoDto { public string Grupo { get; set; } = string.Empty; public int TotalInfants { get; set; } public int Sesiones { get; set; } public double TasaAcierto { get; set; } public double RespMediaMs { get; set; } public double TasaAbandono { get; set; } public double TasaFinalizacion { get; set; } }

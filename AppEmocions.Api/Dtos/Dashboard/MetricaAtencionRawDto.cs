@@ -1,0 +1,1 @@
+namespace AppEmocions.Api.Dtos.Dashboard; public sealed class MetricaAtencionRawDto { public string Codigo { get; set; } = string.Empty; public int Interrumpidas { get; set; } public double? RespMs { get; set; } public int AcRec { get; set; } public int TotRec { get; set; } public int AcAnt { get; set; } public int TotAnt { get; set; } }
