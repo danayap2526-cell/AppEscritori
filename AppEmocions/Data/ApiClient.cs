@@ -43,9 +43,7 @@ namespace AppEmocions.Data
             resp.EnsureSuccessStatusCode();
         }
 
-        // =====================================================
-        // DASHBOARD
-        // =====================================================
+        
 
         // desde/hasta inclusivos. grupo = null -> todos los grupos.
         private static string Filtros(DateTime desde, DateTime hasta, string? grupo)
