@@ -1,4 +1,4 @@
-using AppEmocions.Api.Dtos.Usuaris;
+﻿using AppEmocions.Api.Dtos.Usuaris;
 
 using System.Security.Cryptography;
 using System.Text;
@@ -98,6 +98,53 @@ public sealed class UsuarisRepository
         const string sqlUpdate = "UPDATE dbo.docente SET contrasena_hash = @NuevoHash WHERE docente_id = @Id;";
         await conn.ExecuteAsync(sqlUpdate, new { Id = docenteId, NuevoHash = HashPassword(req.ContrasenaNueva) });
         return true;
+    }
+
+    public async Task<(DocenteDto? Docente, string? Error)> ValidarLoginAsync(string usuario, string contrasena)
+    {
+        using var conn = _db.CreateConnection();
+
+        const string sql = @"
+            SELECT docente_id, usuario, nombre_visible, contrasena_hash, email, rol, activo, ultimo_acceso
+            FROM dbo.docente
+            WHERE usuario = @Usuario;";
+
+        var row = await conn.QueryFirstOrDefaultAsync<dynamic>(sql, new { Usuario = usuario.Trim() });
+        if (row is null)
+            return (null, "Usuari o contrasenya incorrectes.");
+
+        string hashGuardado = (string?)row.contrasena_hash ?? string.Empty;
+        string hashIntroducido = HashPassword(contrasena);
+
+        if (!string.Equals(hashGuardado, hashIntroducido, StringComparison.OrdinalIgnoreCase))
+            return (null, "Usuari o contrasenya incorrectes.");
+
+        bool activo = Convert.ToBoolean(row.activo);
+        if (!activo)
+            return (null, "Aquest compte d'usuari estÃ  desactivat.");
+
+        int docenteId = (int)row.docente_id;
+        await conn.ExecuteAsync(
+            "UPDATE dbo.docente SET ultimo_acceso = GETDATE() WHERE docente_id = @Id;",
+            new { Id = docenteId });
+
+        var grupos = (await conn.QueryAsync<string>(
+            "SELECT grupo FROM dbo.docente_grupo WHERE docente_id = @Id;",
+            new { Id = docenteId })).ToList();
+
+        var docente = new DocenteDto
+        {
+            DocenteId = docenteId,
+            Usuario = (string)row.usuario,
+            NombreVisible = (string)row.nombre_visible,
+            Email = (string?)row.email,
+            Rol = (string)row.rol,
+            Activo = true,
+            UltimoAcceso = DateTime.Now,
+            Grupos = grupos
+        };
+
+        return (docente, null);
     }
 
     private static string HashPassword(string plain)

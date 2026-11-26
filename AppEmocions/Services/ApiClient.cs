@@ -1,4 +1,4 @@
-using AppEmocions.Models.Dades;
+﻿using AppEmocions.Models.Dades;
 using AppEmocions.Models.Dashboard;
 using AppEmocions.Models.Infants;
 using AppEmocions.Models.Jocs;
@@ -167,6 +167,26 @@ public static class ApiClient
     // =====================================================
     // USUARIS (DOCENTES)
     // =====================================================
+
+    public static async Task<DocenteDto> LoginAsync(string usuario, string contrasena, CancellationToken ct = default)
+    {
+        using var resp = await _http.PostAsJsonAsync(
+            "api/usuaris/login",
+            new { usuario, contrasena },
+            _jsonOpts,
+            ct);
+
+        if (!resp.IsSuccessStatusCode)
+        {
+            string msg = (await resp.Content.ReadAsStringAsync(ct)).Trim('"');
+            throw new InvalidOperationException(string.IsNullOrWhiteSpace(msg)
+                ? "Usuari o contrasenya incorrectes."
+                : msg);
+        }
+
+        return await resp.Content.ReadFromJsonAsync<DocenteDto>(_jsonOpts, ct)
+            ?? throw new InvalidOperationException("No s'ha pogut llegir la sessió de l'usuari.");
+    }
 
     public static async Task<List<DocenteDto>> ListarDocentesAsync(CancellationToken ct = default) =>
         await _http.GetFromJsonAsync<List<DocenteDto>>("api/usuaris/docentes", _jsonOpts, ct) ?? new();

@@ -1,4 +1,4 @@
-using AppEmocions.Api.Data;
+﻿using AppEmocions.Api.Data;
 using AppEmocions.Api.Dtos.Usuaris;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,6 +11,19 @@ public sealed class UsuarisController : ControllerBase
     private readonly UsuarisRepository _repo;
 
     public UsuarisController(UsuarisRepository repo) => _repo = repo;
+
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Usuario) || string.IsNullOrWhiteSpace(request.Contrasena))
+            return BadRequest("Introdueix l'usuari i la contrasenya.");
+
+        var (docente, error) = await _repo.ValidarLoginAsync(request.Usuario, request.Contrasena);
+        if (docente is null)
+            return Unauthorized(error ?? "Usuari o contrasenya incorrectes.");
+
+        return Ok(docente);
+    }
 
     [HttpGet("docentes")]
     public async Task<IActionResult> ObtenerDocentes() => Ok(await _repo.ObtenerDocentesAsync());

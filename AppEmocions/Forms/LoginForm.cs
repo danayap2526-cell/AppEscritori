@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Drawing;
-using System.Linq;
+using System.Net.Http;
 using System.Windows.Forms;
 using AppEmocions.Helpers;
-using AppEmocions.Models.Usuaris;
 using AppEmocions.Services;
 
 namespace AppEmocions.Forms
@@ -14,14 +13,10 @@ namespace AppEmocions.Forms
         {
             InitializeComponent();
 
-            // Mantiene el panel izquierdo al 55 % del ancho al cambiar el tamaño
             Resize += (s, e) => pnlLeft.Width = (int)(ClientSize.Width * 0.55);
-
-            // Mantiene la tarjeta centrada en el panel derecho
             pnlRight.Resize += (s, e) => CentrarTarjeta();
             CentrarTarjeta();
 
-            // Conecta el botón con su método
             btnEntrar.Click += BtnEntrar_Click;
         }
 
@@ -34,10 +29,8 @@ namespace AppEmocions.Forms
         private async void BtnEntrar_Click(object? sender, EventArgs e)
         {
             string usuari = txtUsuari.Text.Trim();
-
             string contrasenya = txtContrasenya.Text;
 
-            // 1. Validación básica: campos vacíos
             if (string.IsNullOrEmpty(usuari) || string.IsNullOrEmpty(contrasenya))
             {
                 MessageBox.Show(
@@ -48,22 +41,42 @@ namespace AppEmocions.Forms
                 return;
             }
 
-            // 2. TODO: aquí irá la validación real contra la API.
+            try
+            {
+                btnEntrar.Enabled = false;
+                var docente = await ApiClient.LoginAsync(usuari, contrasenya);
+                SesionActual.Iniciar(docente);
 
-            // 3. Abrir el dashboard de Diego
-            var dashboard = new FrmDashboard();
+                var dashboard = new FrmDashboard();
+                dashboard.FormClosed += (s, args) => Close();
 
-            // Cuando se cierre el dashboard, se cierra también el login
-            // y con él termina la aplicación.
-            dashboard.FormClosed += (s, args) => Close();
-
-            Hide();            // oculta el login (no lo cierra)
-            dashboard.Show();
+                Hide();
+                dashboard.Show();
+            }
+            catch (HttpRequestException)
+            {
+                MessageBox.Show(
+                    "No s'ha pogut connectar amb el servidor (API). Comprova que AppEmocions.Api estigui en marxa.",
+                    "Error de connexiÃ³",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    ex.Message,
+                    "AccÃ©s denegat",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+            }
+            finally
+            {
+                btnEntrar.Enabled = true;
+            }
         }
 
         private void pnlLeft_Paint(object sender, PaintEventArgs e)
         {
-
         }
     }
 }
