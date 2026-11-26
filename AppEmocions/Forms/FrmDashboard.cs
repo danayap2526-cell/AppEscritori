@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using AppEmocions.Data;
 using Guna.UI2.WinForms;
+using AppEmocions.Controls;
 
 namespace AppEmocions.Forms
 {
@@ -31,6 +32,9 @@ namespace AppEmocions.Forms
         private Guna2Panel panelContenido = null!;
         private Guna2Panel panelCabecera = null!;
         private Guna2Panel panelNavegacion = null!;
+        private Panel zonaDashboard = null!;
+        private UcJocs? ucJocs;
+        private Label lblTitolCabecera = null!;
 
         private readonly List<Guna2Button> botonesMenu = new();
 
@@ -395,7 +399,6 @@ namespace AppEmocions.Forms
 
             CrearCabeceraMenu();
             CrearNavegacion();
-            CrearPieMenu();
 
             panelNavegacion.BringToFront();
         }
@@ -483,6 +486,7 @@ namespace AppEmocions.Forms
         {
             Guna2Button boton = new Guna2Button();
 
+            boton.Tag = nombre;
             boton.Size = new Size(274, 53);
             boton.BorderRadius = 12;
             boton.BorderThickness = 0;
@@ -515,39 +519,39 @@ namespace AppEmocions.Forms
                 boton.FillColor = azulMenu;
 
             seleccionado.FillColor = azulSeleccionado;
+
+            // Cambia la pantalla de la derecha según el botón pulsado
+            MostrarSeccion(seleccionado.Tag?.ToString() ?? "");
         }
 
-        private void CrearPieMenu()
+        private void MostrarSeccion(string seccion)
         {
-            Guna2Panel pie = new Guna2Panel();
+            bool esJocs = seccion == "Jocs";
 
-            pie.Dock = DockStyle.Bottom;
-            pie.Height = 125;
-            pie.FillColor = Color.FromArgb(39, 53, 79);
-            pie.BackColor = azulMenu;
-            pie.BorderRadius = 16;
+            // El título grande de la cabecera cambia según la pantalla
+            lblTitolCabecera.Text = esJocs ? "Gestió de jocs" : "Bon dia, Marta";
 
-            Label dibujo = new Label();
-            dibujo.Text = "     ☀\n  ▥  ♡  ▥";
-            dibujo.Font = new Font("Segoe UI Symbol", 19);
-            dibujo.ForeColor = amarillo;
-            dibujo.BackColor = Color.Transparent;
-            dibujo.TextAlign = ContentAlignment.MiddleCenter;
-            dibujo.Location = new Point(15, 5);
-            dibujo.Size = new Size(240, 75);
+            if (esJocs)
+            {
+                // La pantalla de juegos se crea solo la primera vez
+                if (ucJocs == null)
+                {
+                    ucJocs = new UcJocs { Dock = DockStyle.Fill };
+                    panelContenido.Controls.Add(ucJocs);
+                }
 
-            Label titulo = new Label();
-            titulo.Text = "La Brisa t'acompanya";
-            titulo.Font = new Font("Segoe UI", 10, FontStyle.Bold);
-            titulo.ForeColor = Color.White;
-            titulo.BackColor = Color.Transparent;
-            titulo.Location = new Point(15, 80);
-            titulo.AutoSize = true;
+                zonaDashboard.Visible = false;
+                ucJocs.Visible = true;
+                ucJocs.BringToFront();   // el panel Fill debe ser el último en acoplarse
+            }
+            else
+            {
+                if (ucJocs != null)
+                    ucJocs.Visible = false;
 
-            pie.Controls.Add(dibujo);
-            pie.Controls.Add(titulo);
-
-            panelMenu.Controls.Add(pie);
+                zonaDashboard.Visible = true;
+                zonaDashboard.BringToFront();
+            }
         }
 
         // =========================================
@@ -580,6 +584,7 @@ namespace AppEmocions.Forms
             lblEstado.Visible = false;
 
             Label saludo = new Label();
+            lblTitolCabecera = saludo;
             saludo.Text = "Bon dia, Marta";
             saludo.Font = new Font("Segoe UI", 21);
             saludo.ForeColor = texto;
@@ -765,6 +770,7 @@ namespace AppEmocions.Forms
         private void CrearZonaDashboard()
         {
             Panel zona = new Panel();
+            zonaDashboard = zona;
             zona.Dock = DockStyle.Fill;
             zona.BackColor = fondo;
             zona.AutoScroll = true;
