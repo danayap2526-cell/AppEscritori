@@ -1,4 +1,4 @@
-namespace AppEmocions.Moduls;
+﻿namespace AppEmocions.Moduls;
 
 public interface IModuloVista
 {

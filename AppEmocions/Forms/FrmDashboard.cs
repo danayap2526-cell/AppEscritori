@@ -1,10 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using AppEmocions.Helpers;
+using AppEmocions.Models.Usuaris;
 using AppEmocions.Moduls;
 using Guna.UI2.WinForms;
 
@@ -28,10 +29,16 @@ namespace AppEmocions.Forms
         private MonthCalendar calendario = null!;
         private DateTime fechaInicio;
         private DateTime fechaFin;
-        private Label lblEstado = null!;
+        private Label lblEstado = null!; private Label lblTituloCabecera = null!; private Label lblAvatarIniciales = null!; private Label lblNombrePerfil = null!; private Label lblRolPerfil = null!;
         private CancellationTokenSource? _cts;
 
         public event Action<string>? InfantSeleccionado;
+
+        public FrmDashboard(DocenteDto usuario) : this()
+        {
+            SesionActual.Iniciar(usuario);
+            AplicarSesionActual();
+        }
 
         public FrmDashboard()
         {
@@ -47,7 +54,14 @@ namespace AppEmocions.Forms
         }
 
         protected override void OnShown(EventArgs e) { base.OnShown(e); _ = RefrescarVistaActualAsync(); }
-        private string? GrupoSeleccionado() => cmbGrupos.SelectedIndex <= 0 ? null : cmbGrupos.SelectedItem?.ToString();
+        private string? GrupoSeleccionado()
+        {
+            if (!SesionActual.EstaAutenticado || SesionActual.EsAdmin)
+                return cmbGrupos.SelectedIndex <= 0 ? null : cmbGrupos.SelectedItem?.ToString();
+
+            return cmbGrupos.SelectedItem?.ToString()
+                ?? (SesionActual.GruposPermitidos.Count > 0 ? SesionActual.GruposPermitidos[0] : "__SENSE_GRUP__");
+        }
         private void FiltroCambiado() => _ = RefrescarVistaActualAsync();
 
         private async Task RefrescarVistaActualAsync()
@@ -64,13 +78,13 @@ namespace AppEmocions.Forms
             if (!vistasCache.TryGetValue(seccion, out var control)) { control = CrearModulo(seccion); vistasCache[seccion] = control; }
             panelVista.Controls.Clear();
             panelVista.Controls.Add(control);
-            vistaActiva = control as IModuloVista;
+            vistaActiva = control as IModuloVista; if (lblTituloCabecera != null) lblTituloCabecera.Text = seccion == "Tauler" ? $"Bon dia, {SesionActual.PrimerNombre}" : (seccion == "Infants" ? "Llista d'infants" : (seccion == "Comparativa" ? "Comparativa de grup" : (seccion == "Abandonament" ? "Abandonament per nivell" : seccion)));
             _ = RefrescarVistaActualAsync();
         }
 
         private UserControl CrearModulo(string seccion)
         {
-            if (seccion == "Tauler")
+            if (seccion == "Infants") return CrearModuloConEstado(new UcInfants()); if (seccion == "Comparativa") return CrearModuloConEstado(new UcComparativa()); if (seccion == "Abandonament") return CrearModuloConEstado(new UcAbandonament()); if (seccion == "Jocs") return CrearModuloConEstado(new UcJocs()); if (seccion == "Usuaris") return CrearModuloConEstado(new UcUsuaris()); if (seccion == "Dades") return CrearModuloConEstado(new UcDades()); if (seccion == "Tauler")
             {
                 var tauler = new UcTauler();
                 tauler.EstadoCambiado += MostrarEstado;
@@ -84,7 +98,20 @@ namespace AppEmocions.Forms
         }
 
         private void MostrarEstado(string msg, bool err) { lblEstado.Text = msg; lblEstado.ForeColor = err ? TemaApp.RojoError : TemaApp.Gris; lblEstado.Visible = msg.Length > 0; }
-        private void AbrirInfant(string cod) { InfantSeleccionado?.Invoke(cod); MessageBox.Show($"Obrir fitxa de {cod}", "Infant", MessageBoxButtons.OK, MessageBoxIcon.Information); }
+        private void AbrirAltaInfant()
+        {
+            foreach (var kv in botonesMenu)
+                kv.Value.FillColor = kv.Key == "Infants" ? TemaApp.AzulSeleccionado : TemaApp.AzulMenu;
+            lblTituloCabecera.Text = "Nou infant i assignaci\u00f3";
+            var alta = new UcInfantAlta();
+            alta.EstadoCambiado += MostrarEstado;
+            alta.VolverSolicitado += () => NavegarA("Infants");
+            panelVista.Controls.Clear();
+            panelVista.Controls.Add(alta);
+            vistaActiva = alta;
+            _ = RefrescarVistaActualAsync();
+        }
+        private void AbrirInfant(string cod) { InfantSeleccionado?.Invoke(cod); foreach (var kv in botonesMenu) kv.Value.FillColor = kv.Key == "Infants" ? TemaApp.AzulSeleccionado : TemaApp.AzulMenu; lblTituloCabecera.Text = "Detall de l\x27infant"; var det = new UcInfantDetall(cod); det.EstadoCambiado += MostrarEstado; det.VolverSolicitado += () => NavegarA("Infants"); panelVista.Controls.Clear(); panelVista.Controls.Add(det); vistaActiva = det; _ = RefrescarVistaActualAsync(); }
 
         private void ConfigurarFormulario() { Text = "Poble de les Emocions"; WindowState = FormWindowState.Maximized; MinimumSize = new Size(1366, 750); StartPosition = FormStartPosition.CenterScreen; BackColor = TemaApp.Fondo; Font = new Font("Segoe UI", 9); }
 
@@ -136,9 +163,9 @@ namespace AppEmocions.Forms
             lblEstado = new Label { Font = new Font("Segoe UI", 8, FontStyle.Bold), BackColor = Color.Transparent, AutoSize = true, Location = new Point(190, 17), Visible = false };
             panelCabecera.Controls.Add(new Label { Text = "P4 · CURS 2026-27", Font = new Font("Segoe UI", 9, FontStyle.Bold), ForeColor = TemaApp.Gris, AutoSize = true, Location = new Point(32, 16) });
             panelCabecera.Controls.Add(lblEstado);
-            panelCabecera.Controls.Add(new Label { Text = "Bon dia, Marta", Font = new Font("Segoe UI", 21), ForeColor = TemaApp.Texto, AutoSize = true, Location = new Point(31, 35) });
+            lblTituloCabecera = new Label { Text = $"Bon dia, {SesionActual.PrimerNombre}", Font = new Font("Segoe UI", 21), ForeColor = TemaApp.Texto, AutoSize = true, Location = new Point(31, 35) }; panelCabecera.Controls.Add(lblTituloCabecera);
 
-            FlowLayoutPanel controles = new() { FlowDirection = FlowDirection.LeftToRight, WrapContents = false, AutoScroll = false, BackColor = Color.White, Size = new Size(580, 55), Anchor = AnchorStyles.Top | AnchorStyles.Right, Location = new Point(450, 19) };
+            FlowLayoutPanel controles = new() { FlowDirection = FlowDirection.LeftToRight, WrapContents = false, AutoScroll = false, BackColor = Color.White, Size = new Size(595, 55), Anchor = AnchorStyles.Top | AnchorStyles.Right, Location = new Point(450, 19) };
             cmbGrupos = new Guna2ComboBox { Size = new Size(160, 45), BorderRadius = 10, BorderThickness = 1, BorderColor = TemaApp.BordeSuave, FillColor = Color.White, BackColor = Color.White, ForeColor = TemaApp.Texto, Font = new Font("Segoe UI", 9), DropDownStyle = ComboBoxStyle.DropDownList, Margin = new Padding(4, 0, 5, 0) };
             cmbGrupos.HoverState.BorderColor = TemaApp.Turquesa; cmbGrupos.FocusedState.BorderColor = TemaApp.Turquesa;
             cmbGrupos.Items.AddRange(new object[] { "P4-A i P4-B", "P5-A i P5-B", "P4-A", "P4-B", "P5-A", "P5-B" });
@@ -155,12 +182,15 @@ namespace AppEmocions.Forms
             ddCalendario.Items.Add(new ToolStripControlHost(calendario) { Margin = Padding.Empty, Padding = Padding.Empty, AutoSize = true });
             btnFechas.Click += (s, e) => ddCalendario.Show(btnFechas, new Point(0, btnFechas.Height + 4));
 
-            Guna2Panel perfil = new() { Size = new Size(200, 48), FillColor = Color.White, BackColor = Color.White, BorderRadius = 0, Margin = new Padding(5, 0, 0, 0) };
+            Guna2Panel perfil = new() { Size = new Size(215, 48), FillColor = Color.White, BackColor = Color.White, BorderRadius = 0, Margin = new Padding(5, 0, 0, 0) };
             Guna2Panel avatar = new() { Size = new Size(42, 42), Location = new Point(2, 2), BorderRadius = 21, FillColor = Color.FromArgb(220, 239, 238) };
-            avatar.Controls.Add(new Label { Text = "MS", Dock = DockStyle.Fill, BackColor = Color.Transparent, ForeColor = Color.FromArgb(31, 130, 130), Font = new Font("Segoe UI", 10, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter });
+            lblAvatarIniciales = new Label { Text = SesionActual.Iniciales, Dock = DockStyle.Fill, BackColor = Color.Transparent, ForeColor = Color.FromArgb(31, 130, 130), Font = new Font("Segoe UI", 10, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter };
+            avatar.Controls.Add(lblAvatarIniciales);
             perfil.Controls.Add(avatar);
-            perfil.Controls.Add(new Label { Text = "Marta Soler", Font = new Font("Segoe UI", 9, FontStyle.Bold), ForeColor = TemaApp.Texto, AutoSize = true, Location = new Point(52, 4) });
-            perfil.Controls.Add(new Label { Text = "Educador/a", Font = new Font("Segoe UI", 8), ForeColor = TemaApp.Gris, AutoSize = true, Location = new Point(52, 25) });
+            lblNombrePerfil = new Label { Text = SesionActual.NombreCompleto, Font = new Font("Segoe UI", 9, FontStyle.Bold), ForeColor = TemaApp.Texto, AutoSize = true, Location = new Point(52, 4) };
+            lblRolPerfil = new Label { Text = SesionActual.RolVisible, Font = new Font("Segoe UI", 8), ForeColor = TemaApp.Gris, AutoSize = true, Location = new Point(52, 25) };
+            perfil.Controls.Add(lblNombrePerfil);
+            perfil.Controls.Add(lblRolPerfil);
 
             controles.Controls.Add(cmbGrupos); controles.Controls.Add(btnFechas); controles.Controls.Add(perfil);
             panelCabecera.Controls.Add(controles);
@@ -169,6 +199,54 @@ namespace AppEmocions.Forms
             panelCabecera.BringToFront();
         }
 
-        private void FrmDashboard_Load(object sender, EventArgs e) { }
+        private void FrmDashboard_Load(object sender, EventArgs e) { AplicarSesionActual(); }
+
+        public void AplicarSesionActual()
+        {
+            if (lblAvatarIniciales != null) lblAvatarIniciales.Text = SesionActual.Iniciales;
+            if (lblNombrePerfil != null) lblNombrePerfil.Text = SesionActual.NombreCompleto;
+            if (lblRolPerfil != null) lblRolPerfil.Text = SesionActual.RolVisible;
+            if (lblTituloCabecera != null && vistaActiva is UcTauler)
+                lblTituloCabecera.Text = $"Bon dia, {SesionActual.PrimerNombre}";
+
+            if (cmbGrupos != null && SesionActual.EstaAutenticado)
+            {
+                cmbGrupos.Items.Clear();
+                if (SesionActual.EsAdmin)
+                {
+                    cmbGrupos.Items.AddRange(new object[] { "Tots els grups", "P4-A", "P4-B", "P5-A", "P5-B" });
+                }
+                else if (SesionActual.GruposPermitidos.Count > 0)
+                {
+                    foreach (var g in SesionActual.GruposPermitidos)
+                        cmbGrupos.Items.Add(g);
+                }
+                else
+                {
+                    cmbGrupos.Items.Add("Sense grups assignats");
+                }
+                cmbGrupos.SelectedIndex = 0;
+            }
+
+            foreach (var kv in botonesMenu)
+            {
+                if (kv.Key is "Usuaris" or "Dades" or "ConfiguraciÃ³")
+                    kv.Value.Visible = !SesionActual.EstaAutenticado || SesionActual.EsAdmin;
+            }
+
+            _ = RefrescarVistaActualAsync();
+        }
+
+        private UserControl CrearModuloConEstado(UserControl modulo)
+        {
+            if (modulo is UcInfants uInf) { uInf.EstadoCambiado += MostrarEstado; uInf.InfantSeleccionado += AbrirInfant; uInf.NuevoInfantSolicitado += AbrirAltaInfant; }
+            if (modulo is UcComparativa uComp) { uComp.EstadoCambiado += MostrarEstado; }
+            else if (modulo is UcAbandonament uAband) { uAband.EstadoCambiado += MostrarEstado; }
+            else if (modulo is UcJocs uJoc) uJoc.EstadoCambiado += MostrarEstado;
+            else if (modulo is UcUsuaris uUsu) uUsu.EstadoCambiado += MostrarEstado;
+            else if (modulo is UcDades uDad) uDad.EstadoCambiado += MostrarEstado;
+            return modulo;
+        }
     }
 }
+

@@ -9,7 +9,7 @@ public sealed class JocsRepository(DbConnectionFactory db)
     public async Task<IEnumerable<JuegoDto>> ObtenerTodosAsync()
     {
         using var conn = db.CreateConnection();
-        return await conn.QueryAsync<JuegoDto>("SELECT juego_id AS JuegoId, nombre AS Nombre, descripcion AS Descripcion, activo AS Activo FROM dbo.Juegos ORDER BY juego_id;");
+        return await conn.QueryAsync<JuegoDto>("SELECT juego_id AS JuegoId, nombre AS Nombre, descripcion AS Descripcion, activo AS Activo FROM dbo.Juego ORDER BY juego_id;");
     }
 
     public async Task<int> CrearAsync(GuardarJuegoRequest req)
