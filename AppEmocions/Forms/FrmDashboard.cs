@@ -75,7 +75,11 @@ namespace AppEmocions.Forms
         private void NavegarA(string seccion)
         {
             foreach (var kv in botonesMenu) kv.Value.FillColor = kv.Key == seccion ? TemaApp.AzulSeleccionado : TemaApp.AzulMenu;
-            if (!vistasCache.TryGetValue(seccion, out var control)) { control = CrearModulo(seccion); vistasCache[seccion] = control; }
+            if (!vistasCache.TryGetValue(seccion, out var control))
+            {
+                control = CrearModulo(seccion);
+                vistasCache[seccion] = control;
+            }
             panelVista.Controls.Clear();
             panelVista.Controls.Add(control);
             vistaActiva = control as IModuloVista; if (lblTituloCabecera != null) lblTituloCabecera.Text = seccion == "Tauler" ? $"Bon dia, {SesionActual.PrimerNombre}" : (seccion == "Infants" ? "Llista d'infants" : (seccion == "Comparativa" ? "Comparativa de grup" : (seccion == "Abandonament" ? "Abandonament per nivell" : seccion)));
@@ -93,7 +97,14 @@ namespace AppEmocions.Forms
                 return tauler;
             }
             var ph = new UserControl { Dock = DockStyle.Fill, BackColor = TemaApp.Fondo };
-            ph.Controls.Add(new Label { Text = $"Mòdul «{seccion}» pendent d'implementar", Font = new Font("Segoe UI", 14, FontStyle.Bold), ForeColor = TemaApp.Gris, AutoSize = true, Location = new Point(40, 40) });
+            ph.Controls.Add(new Label
+            {
+                Text = $"Mòdul «{seccion}» pendent d'implementar",
+                Font = new Font("Segoe UI", 14, FontStyle.Bold),
+                ForeColor = TemaApp.Gris,
+                AutoSize = true,
+                Location = new Point(40, 40)
+            });
             return ph;
         }
 
@@ -113,11 +124,24 @@ namespace AppEmocions.Forms
         }
         private void AbrirInfant(string cod) { InfantSeleccionado?.Invoke(cod); foreach (var kv in botonesMenu) kv.Value.FillColor = kv.Key == "Infants" ? TemaApp.AzulSeleccionado : TemaApp.AzulMenu; lblTituloCabecera.Text = "Detall de l\x27infant"; var det = new UcInfantDetall(cod); det.EstadoCambiado += MostrarEstado; det.VolverSolicitado += () => NavegarA("Infants"); panelVista.Controls.Clear(); panelVista.Controls.Add(det); vistaActiva = det; _ = RefrescarVistaActualAsync(); }
 
-        private void ConfigurarFormulario() { Text = "Poble de les Emocions"; WindowState = FormWindowState.Maximized; MinimumSize = new Size(1366, 750); StartPosition = FormStartPosition.CenterScreen; BackColor = TemaApp.Fondo; Font = new Font("Segoe UI", 9); }
+        private void ConfigurarFormulario()
+        {
+            Text = "Poble de les Emocions";
+            WindowState = FormWindowState.Maximized;
+            MinimumSize = new Size(1366, 750);
+            StartPosition = FormStartPosition.CenterScreen;
+            BackColor = TemaApp.Fondo;
+            Font = new Font("Segoe UI", 9);
+        }
 
         private void CrearContenido()
         {
-            panelContenido = new Guna2Panel { Dock = DockStyle.Fill, FillColor = TemaApp.Fondo, BorderRadius = 0 };
+            panelContenido = new Guna2Panel
+            {
+                Dock = DockStyle.Fill,
+                FillColor = TemaApp.Fondo,
+                BorderRadius = 0
+            };
             Controls.Add(panelContenido);
             CrearCabeceraSuperior();
             panelVista = new Panel { Dock = DockStyle.Fill, BackColor = TemaApp.Fondo };
@@ -127,41 +151,153 @@ namespace AppEmocions.Forms
 
         private void CrearMenuLateral()
         {
-            panelMenu = new Guna2Panel { Dock = DockStyle.Left, Width = 300, FillColor = TemaApp.AzulMenu, BackColor = TemaApp.AzulMenu, BorderRadius = 0 };
+            panelMenu = new Guna2Panel
+            {
+                Dock = DockStyle.Left,
+                Width = 300,
+                FillColor = TemaApp.AzulMenu,
+                BackColor = TemaApp.AzulMenu,
+                BorderRadius = 0
+            };
             Controls.Add(panelMenu);
-            Guna2Panel cab = new() { Dock = DockStyle.Top, Height = 88, FillColor = TemaApp.AzulMenu, BackColor = TemaApp.AzulMenu };
-            Guna2Panel logo = new() { Size = new Size(46, 46), Location = new Point(22, 15), FillColor = TemaApp.Amarillo, BackColor = TemaApp.AzulMenu, BorderRadius = 13 };
-            logo.Controls.Add(new Label { Text = "P", Font = new Font("Segoe UI", 22, FontStyle.Bold), ForeColor = TemaApp.AzulMenu, BackColor = Color.Transparent, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter });
+            Guna2Panel cab = new()
+            {
+                Dock = DockStyle.Top,
+                Height = 88,
+                FillColor = TemaApp.AzulMenu,
+                BackColor = TemaApp.AzulMenu
+            };
+            Guna2Panel logo = new()
+            {
+                Size = new Size(46, 46),
+                Location = new Point(22, 15),
+                FillColor = TemaApp.Amarillo,
+                BackColor = TemaApp.AzulMenu,
+                BorderRadius = 13
+            };
+            logo.Controls.Add(new Label
+            {
+                Text = "P",
+                Font = new Font("Segoe UI", 22, FontStyle.Bold),
+                ForeColor = TemaApp.AzulMenu,
+                BackColor = Color.Transparent,
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleCenter
+            });
             cab.Controls.Add(logo);
-            cab.Controls.Add(new Label { Text = "Poble de les Emocions", Font = new Font("Segoe UI", 11, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.Transparent, AutoSize = true, Location = new Point(85, 18) });
-            cab.Controls.Add(new Label { Text = "Panell d'educadors", Font = new Font("Segoe UI", 9), ForeColor = Color.FromArgb(190, 205, 225), BackColor = Color.Transparent, AutoSize = true, Location = new Point(85, 43) });
+            cab.Controls.Add(new Label
+            {
+                Text = "Poble de les Emocions",
+                Font = new Font("Segoe UI", 11, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.Transparent,
+                AutoSize = true,
+                Location = new Point(85, 18)
+            });
+            cab.Controls.Add(new Label
+            {
+                Text = "Panell d'educadors",
+                Font = new Font("Segoe UI", 9),
+                ForeColor = Color.FromArgb(190, 205, 225),
+                BackColor = Color.Transparent,
+                AutoSize = true,
+                Location = new Point(85, 43)
+            });
             panelMenu.Controls.Add(cab);
 
-            panelNavegacion = new Guna2Panel { Dock = DockStyle.Fill, FillColor = TemaApp.AzulMenu, BackColor = TemaApp.AzulMenu };
+            panelNavegacion = new Guna2Panel
+            {
+                Dock = DockStyle.Fill,
+                FillColor = TemaApp.AzulMenu,
+                BackColor = TemaApp.AzulMenu
+            };
             panelMenu.Controls.Add(panelNavegacion);
             string[] nombres = { "Tauler", "Infants", "Comparativa", "Abandonament", "Jocs", "Usuaris", "Dades", "Configuració" };
             string[] iconos = { "▦", "♙", "▥", "☰", "♧", "♢", "▤", "⚙" };
             for (int i = 0; i < nombres.Length; i++)
             {
                 string nom = nombres[i];
-                Guna2Button btn = new() { Size = new Size(274, 53), BorderRadius = 12, BorderThickness = 0, BorderColor = TemaApp.AzulMenu, FillColor = i == 0 ? TemaApp.AzulSeleccionado : TemaApp.AzulMenu, BackColor = TemaApp.AzulMenu, ForeColor = Color.White, Font = new Font("Segoe UI", 10), Text = iconos[i] + "     " + nom, TextAlign = HorizontalAlignment.Left, TextOffset = new Point(12, 0), Cursor = Cursors.Hand, UseTransparentBackground = false, Location = new Point(13, 14 + i * 59) };
-                btn.ShadowDecoration.Enabled = false; btn.HoverState.FillColor = TemaApp.AzulSeleccionado; btn.HoverState.BorderColor = TemaApp.AzulMenu;
+                Guna2Button btn = new()
+                {
+                    Size = new Size(274, 53),
+                    BorderRadius = 12,
+                    BorderThickness = 0,
+                    BorderColor = TemaApp.AzulMenu,
+                    FillColor = i == 0 ? TemaApp.AzulSeleccionado : TemaApp.AzulMenu,
+                    BackColor = TemaApp.AzulMenu,
+                    ForeColor = Color.White,
+                    Font = new Font("Segoe UI", 10),
+                    Text = iconos[i] + "     " + nom,
+                    TextAlign = HorizontalAlignment.Left,
+                    TextOffset = new Point(12, 0),
+                    Cursor = Cursors.Hand,
+                    UseTransparentBackground = false,
+                    Location = new Point(13, 14 + i * 59)
+                };
+                btn.ShadowDecoration.Enabled = false;
+                btn.HoverState.FillColor = TemaApp.AzulSeleccionado;
+                btn.HoverState.BorderColor = TemaApp.AzulMenu;
                 btn.Click += (s, e) => NavegarA(nom);
                 panelNavegacion.Controls.Add(btn); botonesMenu[nom] = btn;
             }
 
-            Guna2Panel pie = new() { Dock = DockStyle.Bottom, Height = 125, FillColor = Color.FromArgb(39, 53, 79), BackColor = TemaApp.AzulMenu, BorderRadius = 16 };
-            pie.Controls.Add(new Label { Text = "     ☀\n  ▥  ♡  ▥", Font = new Font("Segoe UI Symbol", 19), ForeColor = TemaApp.Amarillo, BackColor = Color.Transparent, TextAlign = ContentAlignment.MiddleCenter, Location = new Point(15, 5), Size = new Size(240, 75) });
-            pie.Controls.Add(new Label { Text = "La Brisa t'acompanya", Font = new Font("Segoe UI", 10, FontStyle.Bold), ForeColor = Color.White, BackColor = Color.Transparent, Location = new Point(15, 80), AutoSize = true });
+            Guna2Panel pie = new()
+            {
+                Dock = DockStyle.Bottom,
+                Height = 125,
+                FillColor = Color.FromArgb(39, 53, 79),
+                BackColor = TemaApp.AzulMenu,
+                BorderRadius = 16
+            };
+            pie.Controls.Add(new Label
+            {
+                Text = "     ☀\n  ▥  ♡  ▥",
+                Font = new Font("Segoe UI Symbol", 19),
+                ForeColor = TemaApp.Amarillo,
+                BackColor = Color.Transparent,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Location = new Point(15, 5),
+                Size = new Size(240, 75)
+            });
+            pie.Controls.Add(new Label
+            {
+                Text = "La Brisa t'acompanya",
+                Font = new Font("Segoe UI", 10, FontStyle.Bold),
+                ForeColor = Color.White,
+                BackColor = Color.Transparent,
+                Location = new Point(15, 80),
+                AutoSize = true
+            });
             panelMenu.Controls.Add(pie);
             panelNavegacion.BringToFront();
         }
 
         private void CrearCabeceraSuperior()
         {
-            panelCabecera = new Guna2Panel { Dock = DockStyle.Top, Height = 94, FillColor = Color.White, BackColor = Color.White, BorderRadius = 0 };
-            lblEstado = new Label { Font = new Font("Segoe UI", 8, FontStyle.Bold), BackColor = Color.Transparent, AutoSize = true, Location = new Point(190, 17), Visible = false };
-            panelCabecera.Controls.Add(new Label { Text = "P4 · CURS 2026-27", Font = new Font("Segoe UI", 9, FontStyle.Bold), ForeColor = TemaApp.Gris, AutoSize = true, Location = new Point(32, 16) });
+            panelCabecera = new Guna2Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 94,
+                FillColor = Color.White,
+                BackColor = Color.White,
+                BorderRadius = 0
+            };
+            lblEstado = new Label
+            {
+                Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                BackColor = Color.Transparent,
+                AutoSize = true,
+                Location = new Point(190, 17),
+                Visible = false
+            };
+            panelCabecera.Controls.Add(new Label
+            {
+                Text = "P4 · CURS 2026-27",
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                ForeColor = TemaApp.Gris,
+                AutoSize = true,
+                Location = new Point(32, 16)
+            });
             panelCabecera.Controls.Add(lblEstado);
             lblTituloCabecera = new Label { Text = $"Bon dia, {SesionActual.PrimerNombre}", Font = new Font("Segoe UI", 21), ForeColor = TemaApp.Texto, AutoSize = true, Location = new Point(31, 35) }; panelCabecera.Controls.Add(lblTituloCabecera);
 
@@ -169,17 +305,54 @@ namespace AppEmocions.Forms
             cmbGrupos = new Guna2ComboBox { Size = new Size(160, 45), BorderRadius = 10, BorderThickness = 1, BorderColor = TemaApp.BordeSuave, FillColor = Color.White, BackColor = Color.White, ForeColor = TemaApp.Texto, Font = new Font("Segoe UI", 9), DropDownStyle = ComboBoxStyle.DropDownList, Margin = new Padding(4, 0, 5, 0) };
             cmbGrupos.HoverState.BorderColor = TemaApp.Turquesa; cmbGrupos.FocusedState.BorderColor = TemaApp.Turquesa;
             cmbGrupos.Items.AddRange(new object[] { "P4-A i P4-B", "P5-A i P5-B", "P4-A", "P4-B", "P5-A", "P5-B" });
-            cmbGrupos.SelectedIndex = 0; cmbGrupos.SelectedIndexChanged += (s, e) => FiltroCambiado();
+            cmbGrupos.SelectedIndex = 0;
+            cmbGrupos.SelectedIndexChanged += (s, e) => FiltroCambiado();
 
-            btnFechas = new Guna2Button { Size = new Size(200, 45), BorderRadius = 10, FillColor = Color.White, BackColor = Color.White, ForeColor = TemaApp.Texto, BorderColor = TemaApp.BordeSuave, BorderThickness = 1, Font = new Font("Segoe UI", 9), Cursor = Cursors.Hand, Margin = new Padding(4, 0, 5, 0) };
+            btnFechas = new Guna2Button
+            {
+                Size = new Size(200, 45),
+                BorderRadius = 10,
+                FillColor = Color.White,
+                BackColor = Color.White,
+                ForeColor = TemaApp.Texto,
+                BorderColor = TemaApp.BordeSuave,
+                BorderThickness = 1,
+                Font = new Font("Segoe UI", 9),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(4, 0, 5, 0)
+            };
             btnFechas.HoverState.BorderColor = TemaApp.Turquesa;
             btnFechas.Text = "▣  " + TemaApp.FormatearRangoFechas(fechaInicio, fechaFin) + "  ▾";
 
-            calendario = new MonthCalendar { MaxSelectionCount = 92, FirstDayOfWeek = Day.Monday, ShowToday = false, ShowTodayCircle = false, TitleBackColor = TemaApp.AzulMenu, TitleForeColor = Color.White };
+            calendario = new MonthCalendar
+            {
+                MaxSelectionCount = 92,
+                FirstDayOfWeek = Day.Monday,
+                ShowToday = false,
+                ShowTodayCircle = false,
+                TitleBackColor = TemaApp.AzulMenu,
+                TitleForeColor = Color.White
+            };
             calendario.SetSelectionRange(fechaInicio, fechaFin);
-            calendario.DateSelected += (s, e) => { fechaInicio = e.Start.Date; fechaFin = e.End.Date; btnFechas.Text = "▣  " + TemaApp.FormatearRangoFechas(fechaInicio, fechaFin) + "  ▾"; ddCalendario.Close(); FiltroCambiado(); };
-            ddCalendario = new ToolStripDropDown { Padding = new Padding(4), AutoClose = true };
-            ddCalendario.Items.Add(new ToolStripControlHost(calendario) { Margin = Padding.Empty, Padding = Padding.Empty, AutoSize = true });
+            calendario.DateSelected += (s, e) =>
+            {
+                fechaInicio = e.Start.Date;
+                fechaFin = e.End.Date;
+                btnFechas.Text = "▣  " + TemaApp.FormatearRangoFechas(fechaInicio, fechaFin) + "  ▾";
+                ddCalendario.Close();
+                FiltroCambiado();
+            };
+            ddCalendario = new ToolStripDropDown
+            {
+                Padding = new Padding(4),
+                AutoClose = true
+            };
+            ddCalendario.Items.Add(new ToolStripControlHost(calendario)
+            {
+                Margin = Padding.Empty,
+                Padding = Padding.Empty,
+                AutoSize = true
+            });
             btnFechas.Click += (s, e) => ddCalendario.Show(btnFechas, new Point(0, btnFechas.Height + 4));
 
             Guna2Panel perfil = new() { Size = new Size(215, 48), FillColor = Color.White, BackColor = Color.White, BorderRadius = 0, Margin = new Padding(5, 0, 0, 0) };
@@ -192,7 +365,9 @@ namespace AppEmocions.Forms
             perfil.Controls.Add(lblNombrePerfil);
             perfil.Controls.Add(lblRolPerfil);
 
-            controles.Controls.Add(cmbGrupos); controles.Controls.Add(btnFechas); controles.Controls.Add(perfil);
+            controles.Controls.Add(cmbGrupos);
+            controles.Controls.Add(btnFechas);
+            controles.Controls.Add(perfil);
             panelCabecera.Controls.Add(controles);
             panelCabecera.Resize += (s, e) => controles.Location = new Point(Math.Max(270, panelCabecera.Width - controles.Width - 25), 19);
             panelContenido.Controls.Add(panelCabecera);

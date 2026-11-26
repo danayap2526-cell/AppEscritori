@@ -14,17 +14,32 @@ public static class DashboardCalculator
     {
         double?[] a = ExtraerMetricas(actual);
         double?[] p = ExtraerMetricas(previo);
-        Func<double, string>[] formatos = { v => v.ToString("N0", Cultura), v => v.ToString("N0", Cultura), v => v.ToString("0.0", Cultura), v => v.ToString("0", Cultura) + "%", v => v.ToString("0.0", Cultura) + " s", v => v.ToString("0.0", Cultura) + "%" };
+        Func<double, string>[] formatos = { v => v.ToString("N0", Cultura),
+            v => v.ToString("N0", Cultura),
+            v => v.ToString("0.0", Cultura),
+            v => v.ToString("0", Cultura) + "%",
+            v => v.ToString("0.0", Cultura) + " s",
+            v => v.ToString("0.0", Cultura) + "%" };
         var res = new KpiResultado[6];
         for (int i = 0; i < 6; i++)
         {
             string val = a[i] is double v ? formatos[i](v) : "-";
             bool relativa = i <= 2;
-            if (a[i] == null || p[i] == null || (relativa && p[i]!.Value == 0)) { res[i] = new KpiResultado(val, "", false, 0); continue; }
+            if (a[i] == null || p[i] == null || (relativa && p[i]!.Value == 0))
+            {
+                res[i] = new KpiResultado(val, "", false, 0);
+                continue;
+            }
             double delta = relativa ? (a[i]!.Value - p[i]!.Value) / p[i]!.Value * 100 : a[i]!.Value - p[i]!.Value;
             string unidad = relativa ? "%" : i == 4 ? " s" : " pp";
             if (Math.Round(Math.Abs(delta), 1) == 0) res[i] = new KpiResultado(val, "= 0" + unidad, true, 0);
-            else { bool sube = delta > 0; bool bueno = sube == MayorEsMejor[i]; string txt = (sube ? "▲ " : "▼ ") + Math.Abs(delta).ToString("0.0", Cultura) + unidad; res[i] = new KpiResultado(val, txt, true, bueno ? 1 : -1); }
+            else
+            {
+                bool sube = delta > 0;
+                bool bueno = sube == MayorEsMejor[i];
+                string txt = (sube ? "▲ " : "▼ ") + Math.Abs(delta).ToString("0.0", Cultura) + unidad;
+                res[i] = new KpiResultado(val, txt, true, bueno ? 1 : -1);
+            }
         }
         return res;
     }
@@ -47,7 +62,16 @@ public static class DashboardCalculator
         {
             var d = niveles.FirstOrDefault(x => x.Nivel == n);
             float acierto = 0, error = 0;
-            if (d != null) { double total = d.Aciertos + d.Errores; if (total > 0) { acierto = (float)(d.Aciertos * 100 / total); error = (float)(d.Errores * 100 / total); } else if (d.Registros > 0) { acierto = (float)(d.Completados * 100 / d.Registros); } }
+            if (d != null)
+            {
+                double total = d.Aciertos + d.Errores;
+                if (total > 0)
+                {
+                    acierto = (float)(d.Aciertos * 100 / total);
+                    error = (float)(d.Errores * 100 / total);
+                }
+                else if (d.Registros > 0) { acierto = (float)(d.Completados * 100 / d.Registros); }
+            }
             datos.Add((nombres[n - 1], acierto, error));
         }
         return datos;
