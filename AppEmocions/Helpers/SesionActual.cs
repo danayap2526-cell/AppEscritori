@@ -44,5 +44,30 @@ public static class SesionActual
 
     public static void Iniciar(DocenteDto docente) => Usuario = docente;
 
+    public static void IniciarPorNombreUsuario(string usuarioLogin, DocenteDto? encontradoEnApi = null)
+    {
+        if (encontradoEnApi is not null)
+        {
+            Usuario = encontradoEnApi;
+            return;
+        }
+
+        string limpio = usuarioLogin.Trim();
+        var partes = limpio.Split(new[] { '.', '_', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i < partes.Length; i++)
+            partes[i] = char.ToUpperInvariant(partes[i][0]) + partes[i].Substring(1).ToLowerInvariant();
+
+        string nombreVisible = partes.Length > 0 ? string.Join(" ", partes) : "Docent";
+        bool esAdmin = string.Equals(limpio, "admin", StringComparison.OrdinalIgnoreCase);
+
+        Usuario = new DocenteDto
+        {
+            Usuario = limpio,
+            NombreVisible = esAdmin ? "AdministraciÃ³" : nombreVisible,
+            Rol = esAdmin ? "admin" : "docente",
+            Activo = true
+        };
+    }
+
     public static void Cerrar() => Usuario = null;
 }

@@ -8,6 +8,7 @@ using AppEmocions.Helpers;
 using AppEmocions.Models.Usuaris;
 using AppEmocions.Moduls;
 using Guna.UI2.WinForms;
+using AppEmocions.Controls;
 
 namespace AppEmocions.Forms
 {
@@ -88,7 +89,7 @@ namespace AppEmocions.Forms
 
         private UserControl CrearModulo(string seccion)
         {
-            if (seccion == "Infants") return CrearModuloConEstado(new UcInfants()); if (seccion == "Comparativa") return CrearModuloConEstado(new UcComparativa()); if (seccion == "Abandonament") return CrearModuloConEstado(new UcAbandonament()); if (seccion == "Jocs") return CrearModuloConEstado(new UcJocs()); if (seccion == "Usuaris") return CrearModuloConEstado(new UcUsuaris()); if (seccion == "Dades") return CrearModuloConEstado(new UcDades()); if (seccion == "Tauler")
+            if (seccion == "Infants") return CrearModuloConEstado(new UcInfants()); if (seccion == "Comparativa") return CrearModuloConEstado(new UcComparativa()); if (seccion == "Abandonament") return CrearModuloConEstado(new UcAbandonament()); if (seccion == "Jocs") return new AppEmocions.Controls.UcJocs { Dock = DockStyle.Fill }; if (seccion == "Usuaris") return CrearModuloConEstado(new UcUsuaris()); if (seccion == "Dades") return CrearModuloConEstado(new UcDades()); if (seccion == "Tauler")
             {
                 var tauler = new UcTauler();
                 tauler.EstadoCambiado += MostrarEstado;
@@ -417,7 +418,7 @@ namespace AppEmocions.Forms
             if (modulo is UcInfants uInf) { uInf.EstadoCambiado += MostrarEstado; uInf.InfantSeleccionado += AbrirInfant; uInf.NuevoInfantSolicitado += AbrirAltaInfant; }
             if (modulo is UcComparativa uComp) { uComp.EstadoCambiado += MostrarEstado; }
             else if (modulo is UcAbandonament uAband) { uAband.EstadoCambiado += MostrarEstado; }
-            else if (modulo is UcJocs uJoc) uJoc.EstadoCambiado += MostrarEstado;
+            
             else if (modulo is UcUsuaris uUsu) uUsu.EstadoCambiado += MostrarEstado;
             else if (modulo is UcDades uDad) uDad.EstadoCambiado += MostrarEstado;
             return modulo;
