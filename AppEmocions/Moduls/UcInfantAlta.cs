@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -16,6 +18,7 @@ namespace AppEmocions.Moduls;
 public sealed class UcInfantAlta : UserControl, IModuloVista
 {
     private Guna2TextBox txtNombre = null!;
+    private Guna2TextBox txtContrasenaAlta = null!;
     private Guna2ComboBox cmbGrupoAlta = null!;
     private Guna2ComboBox cmbDocenteAlta = null!;
 
@@ -136,10 +139,23 @@ public sealed class UcInfantAlta : UserControl, IModuloVista
             Font = new Font("Segoe UI", 9.5f)
         };
 
+        cardAlta.Controls.Add(new Label { Text = "Contrasenya app mÃ²bil (opcional)", Location = new Point(24, 338), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold), ForeColor = TemaApp.Texto });
+        txtContrasenaAlta = new Guna2TextBox
+        {
+            PlaceholderText = "Ex: 1234 (deixa en blanc si no en tÃ©)",
+            Location = new Point(24, 362),
+            Size = new Size(300, 40),
+            BorderRadius = 10,
+            BorderThickness = 1,
+            BorderColor = TemaApp.BordeSuave,
+            Font = new Font("Segoe UI", 9.5f),
+            UseSystemPasswordChar = true
+        };
+
         var btnCrear = new Guna2Button
         {
             Text = "Crear participant",
-            Location = new Point(24, 344),
+            Location = new Point(24, 424),
             Size = new Size(300, 42),
             BorderRadius = 10,
             FillColor = TemaApp.Turquesa,
@@ -152,6 +168,7 @@ public sealed class UcInfantAlta : UserControl, IModuloVista
         cardAlta.Controls.Add(txtNombre);
         cardAlta.Controls.Add(cmbGrupoAlta);
         cardAlta.Controls.Add(cmbDocenteAlta);
+        cardAlta.Controls.Add(txtContrasenaAlta);
         cardAlta.Controls.Add(btnCrear);
         cardAlta.Resize += (s, e) =>
         {
@@ -159,6 +176,7 @@ public sealed class UcInfantAlta : UserControl, IModuloVista
             txtNombre.Width = w;
             cmbGrupoAlta.Width = w;
             cmbDocenteAlta.Width = w;
+            txtContrasenaAlta.Width = w;
             btnCrear.Width = w;
         };
 
@@ -457,10 +475,16 @@ public sealed class UcInfantAlta : UserControl, IModuloVista
                 docId = id;
         }
 
+        string clave = txtContrasenaAlta.Text.Trim();
+        string? hashMovil = string.IsNullOrEmpty(clave)
+            ? null
+            : Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(nom + clave))).ToLowerInvariant();
+
         try
         {
-            var res = await ApiClient.CrearInfantAsync(new CrearInfantRequest(nom, cmbGrupoAlta.Text, docId));
+            var res = await ApiClient.CrearInfantAsync(new CrearInfantRequest(nom, cmbGrupoAlta.Text, docId, hashMovil));
             txtNombre.Clear();
+            txtContrasenaAlta.Clear();
             EstadoCambiado?.Invoke($"Participant creat correctament: {res.Codigo}", false);
             await CargarDatosAsync(CancellationToken.None);
         }
